@@ -9,7 +9,12 @@ export default function Home() {
 
     useEffect(() => {
         const getUser = async () => {
-            const { data } = await supabase.auth.getUser()
+            const { data, error } = await supabase.auth.getUser()
+            if (error) {
+                setUser(null)
+                alert('ユーザーの情報の取得に失敗しました')
+                return
+            }
             setUser(data.user)
         }
 
@@ -17,16 +22,26 @@ export default function Home() {
     }, [])
 
     const loginWithDiscord = async () => {
-        await supabase.auth.signInWithOAuth({
+        const { error } = await supabase.auth.signInWithOAuth({
             provider: 'discord',
             options: {
                 redirectTo: `${location.origin}/auth/callback`,
             },
         })
+
+        if (error) {
+            alert('ログインに失敗しました')
+        }
     }
 
     const logout = async () => {
-        await supabase.auth.signOut()
+        const { error } = await supabase.auth.signOut()
+
+        if (error) {
+            alert('ログアウトに失敗しました')
+            return
+        }
+
         setUser(null)
     }
 
