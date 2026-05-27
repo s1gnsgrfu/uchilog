@@ -2,18 +2,25 @@
 
 import { supabase } from '@/lib/supabase'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function AuthCallbackPage() {
-    useEffect(() => {
-        const checkUser = async () => {
-            const { data, error } = await supabase.auth.getUser()
+    const router = useRouter()
 
-            console.log(data.user)
-            console.log(error)
+    useEffect(() => {
+        const handleCallback = async () => {
+            const { error } = await supabase.auth.getSession()
+
+            if (error) {
+                router.replace('/?authError=callback_failed')
+                return
+            }
+
+            router.replace('/')
         }
 
-        checkUser()
-    }, [])
+        handleCallback()
+    }, [router])
 
-    return <main className="p-10">ログイン確認中...</main>
+    return <main className="p-10">ログイン処理中...</main>
 }
