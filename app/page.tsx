@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from '@/lib/supabase'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 export default function Home() {
@@ -9,6 +9,14 @@ export default function Home() {
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [message, setMessage] = useState('')
+    type Diary = {
+        id: string
+        user_id: string
+        title: string
+        body: string
+        created_at: string
+    }
+    const [diaries, setDiaries] = useState<Diary[]>([])
 
     useEffect(() => {
         const getUser = async () => {
@@ -47,7 +55,31 @@ export default function Home() {
         }
 
         setUser(null)
+        setDiaries([])
     }
+
+    const fetchDiaries = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('diaries')
+            .select('*')
+            .order('created_at', { ascending: false })
+
+        if (error) {
+            setMessage(`日記の取得に失敗しました: ${error.message}`)
+            return
+        }
+
+        setDiaries(data ?? [])
+    }, [])
+
+    useEffect(() => {
+        if (!user) {
+            setDiaries([])
+            return
+        }
+
+        fetchDiaries()
+    }, [user, fetchDiaries])
 
     const createDiary = async () => {
         if (!user) {
@@ -74,6 +106,7 @@ export default function Home() {
         setTitle('')
         setBody('')
         setMessage('投稿しました')
+        fetchDiaries()
     }
 
     return (
@@ -118,6 +151,22 @@ export default function Home() {
                         >
                             投稿
                         </button>
+                    </section>
+                    <section className="space-y-4 rounded border p-4">
+                        <h2 className="text-xl font-bold">日記一覧</h2>
+
+                        {diaries.length === 0 ? (
+                            <p className="text-sm text-gray-600">まだ日記がありません</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {diaries.map((diary) => (
+                                    <article key={diary.id} className="rounded border p-3">
+                                        <h3 className="font-bold">{diary.title}</h3>
+                                        <p className="whitespace-pre-wrap text-sm">{diary.body}</p>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
                     </section>
                 </div>
             ) : (
