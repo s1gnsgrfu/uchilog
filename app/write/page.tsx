@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { AppHeader } from '../components/AppHeader'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { syncProfile } from '../utils/profiles'
 
@@ -127,12 +128,9 @@ export default function WritePage() {
 
     return (
         <main className="min-h-screen bg-[#f6f1e8]">
-            <header className="border-b border-black/5 bg-white/60">
-                <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-                    <Link href="/timeline" className="font-bold text-zinc-950">
-                        UchiLog
-                    </Link>
-                    <div className="flex items-center gap-2">
+            <AppHeader
+                actions={
+                    <>
                         <button
                             onClick={() => setIsHelpOpen(true)}
                             className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950"
@@ -146,9 +144,9 @@ export default function WritePage() {
                         >
                             {isSubmitting ? '投稿中' : '投稿する'}
                         </button>
-                    </div>
-                </div>
-            </header>
+                    </>
+                }
+            />
 
             <section className="mx-auto grid max-w-5xl gap-5 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
                 <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
@@ -182,14 +180,26 @@ export default function WritePage() {
             </section>
 
             {isHelpOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-zinc-950/40 px-3 py-5 sm:px-4 sm:py-6">
+                <div
+                    onClick={() => setIsHelpOpen(false)}
+                    className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-zinc-950/40 px-3 py-5 sm:px-4 sm:py-6"
+                >
                     <section
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="markdown-help-title"
-                        className="max-h-[88vh] w-full min-w-0 max-w-2xl overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-5"
+                        onClick={(event) => event.stopPropagation()}
+                        className="relative max-h-[88vh] w-full min-w-0 max-w-2xl overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-5"
                     >
-                        <div className="flex min-w-0 flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <button
+                            onClick={() => setIsHelpOpen(false)}
+                            aria-label="書き方ヘルプを閉じる"
+                            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-xl font-semibold leading-none text-zinc-600 shadow-sm hover:border-zinc-400 hover:text-zinc-950"
+                        >
+                            ×
+                        </button>
+
+                        <div className="flex min-w-0 flex-col gap-3 border-b border-zinc-100 pb-4 pr-11 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div className="min-w-0">
                                 <h2 id="markdown-help-title" className="text-xl font-bold text-zinc-950">
                                     Markdownの書き方
@@ -198,12 +208,6 @@ export default function WritePage() {
                                     よく使う形だけ覚えれば大丈夫です。例を押すと本文に追加できます。
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setIsHelpOpen(false)}
-                                className="w-fit rounded-full border border-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
-                            >
-                                閉じる
-                            </button>
                         </div>
 
                         <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">

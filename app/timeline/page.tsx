@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { AppHeader } from '../components/AppHeader'
 import { Avatar } from '../components/Avatar'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
 import { formatDateLabel, getDateKey } from '../utils/format'
@@ -207,12 +208,9 @@ export default function TimelinePage() {
 
     return (
         <main className="min-h-screen bg-[#f6f1e8]">
-            <header className="sticky top-0 z-10 border-b border-black/5 bg-[#f6f1e8]/90 backdrop-blur">
-                <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-                    <Link href="/timeline" className="text-xl font-bold text-zinc-950">
-                        UchiLog
-                    </Link>
-                    <div className="flex items-center gap-3">
+            <AppHeader
+                actions={
+                    <>
                         <Link
                             href="/write"
                             className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
@@ -222,9 +220,9 @@ export default function TimelinePage() {
                         <button onClick={logout} className="text-sm font-medium text-zinc-600 hover:text-zinc-950">
                             ログアウト
                         </button>
-                    </div>
-                </div>
-            </header>
+                    </>
+                }
+            />
 
             <section className="mx-auto max-w-3xl px-3 py-6">
                 {message && <p className="mb-4 rounded-xl bg-white px-4 py-3 text-sm text-red-600 shadow-sm">{message}</p>}
