@@ -182,15 +182,15 @@ export default function WritePage() {
             </section>
 
             {isHelpOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-zinc-950/40 px-3 py-5 sm:px-4 sm:py-6">
                     <section
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="markdown-help-title"
-                        className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+                        className="max-h-[88vh] w-full min-w-0 max-w-2xl overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-5"
                     >
-                        <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-4">
-                            <div>
+                        <div className="flex min-w-0 flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                            <div className="min-w-0">
                                 <h2 id="markdown-help-title" className="text-xl font-bold text-zinc-950">
                                     Markdownの書き方
                                 </h2>
@@ -200,27 +200,27 @@ export default function WritePage() {
                             </div>
                             <button
                                 onClick={() => setIsHelpOpen(false)}
-                                className="rounded-full border border-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
+                                className="w-fit rounded-full border border-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
                             >
                                 閉じる
                             </button>
                         </div>
 
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
                             {markdownTips.map((tip) => (
-                                <article key={tip.label} className="rounded-xl border border-zinc-200 p-4">
-                                    <div className="flex items-center justify-between gap-3">
+                                <article key={tip.label} className="min-w-0 rounded-xl border border-zinc-200 p-4">
+                                    <div className="flex min-w-0 items-center justify-between gap-3">
                                         <h3 className="font-bold text-zinc-950">{tip.label}</h3>
                                         <button
                                             onClick={() => insertMarkdown(tip.example)}
-                                            className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
+                                            className="shrink-0 rounded-full bg-zinc-950 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
                                         >
                                             入れる
                                         </button>
                                     </div>
                                     <p className="mt-2 text-sm leading-6 text-zinc-500">{tip.description}</p>
-                                    <pre className="mt-3 overflow-x-auto rounded-lg bg-zinc-100 p-3 text-sm text-zinc-800">
-                                        <code>{tip.example}</code>
+                                    <pre className="mt-3 min-w-0 whitespace-pre-wrap break-words rounded-lg bg-zinc-100 p-3 text-sm text-zinc-800">
+                                        <code className="break-words">{tip.example}</code>
                                     </pre>
                                 </article>
                             ))}
