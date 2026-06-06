@@ -260,7 +260,7 @@ export default function WritePage() {
                         rows={18}
                         disabled={isCheckingAuth}
                         aria-invalid={Boolean(fieldErrors.body)}
-                        className={`w-full resize-y rounded-xl border px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400 ${
+                        className={`h-56 w-full resize-y rounded-xl border px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400 sm:h-auto ${
                             fieldErrors.body ? 'border-red-400' : 'border-zinc-200'
                         }`}
                     />
