@@ -9,7 +9,7 @@ import { AppHeader } from '../components/AppHeader'
 import { Avatar } from '../components/Avatar'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
-import { syncProfile } from '../utils/profiles'
+import { profileFromUserMetadata, syncProfile } from '../utils/profiles'
 import type { Profile } from '../utils/types'
 
 export default function MenuPage() {
@@ -111,6 +111,18 @@ export default function MenuPage() {
         setMessage('プロフィールを保存しました')
     }
 
+    const resetProfileFormToDiscord = () => {
+        if (!user) {
+            setMessage('ログインしてください')
+            return
+        }
+
+        const defaultProfile = profileFromUserMetadata(user)
+        setDisplayName(defaultProfile.display_name)
+        setAvatarUrl(defaultProfile.avatar_url ?? '')
+        setBio('')
+    }
+
     const logout = async () => {
         const { error } = await supabase.auth.signOut()
 
@@ -196,23 +208,31 @@ export default function MenuPage() {
                             rows={4}
                             className="w-full resize-y rounded-xl border border-zinc-200 px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                         />
-                        <div className="flex justify-end gap-2">
+                        <div className="flex items-center justify-between gap-2">
                             <button
-                                onClick={() => {
-                                    setProfileForm(profile)
-                                    setIsEditingProfile(false)
-                                }}
-                                className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
+                                onClick={resetProfileFormToDiscord}
+                                className="shrink-0 rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
                             >
-                                キャンセル
+                                元に戻す
                             </button>
-                            <button
-                                onClick={saveProfile}
-                                disabled={isSavingProfile}
-                                className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:bg-zinc-400"
-                            >
-                                {isSavingProfile ? '保存中' : '保存'}
-                            </button>
+                            <div className="flex min-w-0 justify-end gap-2">
+                                <button
+                                    onClick={() => {
+                                        setProfileForm(profile)
+                                        setIsEditingProfile(false)
+                                    }}
+                                    className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
+                                >
+                                    キャンセル
+                                </button>
+                                <button
+                                    onClick={saveProfile}
+                                    disabled={isSavingProfile}
+                                    className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:bg-zinc-400"
+                                >
+                                    {isSavingProfile ? '保存中' : '保存'}
+                                </button>
+                            </div>
                         </div>
                     </section>
                 )}
