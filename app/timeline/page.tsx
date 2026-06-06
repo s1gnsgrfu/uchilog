@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -10,6 +11,7 @@ import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
 import { formatDateLabel, getDateKey } from '../utils/format'
+import { getFirstMarkdownImage } from '../utils/markdown'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
 
 const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs = 10000) => {
@@ -253,6 +255,7 @@ export default function TimelinePage() {
                                 {group.diaries.map((diary) => {
                                     const isOwn = diary.user_id === user.id
                                     const authorName = diary.author?.display_name ?? (isOwn ? profile?.display_name : null) ?? '名無し'
+                                    const thumbnail = getFirstMarkdownImage(diary.body)
 
                                     return (
                                         <div
@@ -265,13 +268,23 @@ export default function TimelinePage() {
                                                 <p className="mb-1 px-1 text-xs font-semibold text-zinc-500">{authorName}</p>
                                                 <Link
                                                     href={`/diary/${diary.id}`}
-                                                    className={`block rounded-2xl px-4 py-3 text-left text-sm font-semibold leading-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                                    className={`block space-y-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold leading-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                                                         isOwn
                                                             ? 'rounded-br-sm bg-[#95e267] text-zinc-950'
                                                             : 'rounded-bl-sm bg-white text-zinc-950'
                                                     }`}
                                                 >
-                                                    {diary.title}
+                                                    <span>{diary.title}</span>
+                                                    {thumbnail && (
+                                                        <Image
+                                                            src={thumbnail.src}
+                                                            alt={thumbnail.alt}
+                                                            width={120}
+                                                            height={80}
+                                                            unoptimized
+                                                            className="h-20 w-28 rounded-xl object-cover ring-1 ring-black/5"
+                                                        />
+                                                    )}
                                                 </Link>
                                             </div>
 
