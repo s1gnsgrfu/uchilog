@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { use, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AppHeader } from '../../components/AppHeader'
+import { AppLink } from '../../components/AppLink'
 import { Avatar } from '../../components/Avatar'
 import { LogoutConfirmDialog } from '../../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../../components/MarkdownRenderer'
@@ -74,9 +74,9 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
                     <p className="font-semibold text-zinc-900">日記が見つかりませんでした</p>
                     <p className="mt-2 text-sm text-red-600">{message}</p>
-                    <Link href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
+                    <AppLink href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
                         タイムラインへ
-                    </Link>
+                    </AppLink>
                 </section>
             </main>
         )
@@ -89,9 +89,9 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
             <AppHeader
                 actions={
                     <>
-                        <Link href="/write" className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white">
+                        <AppLink href="/write" className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white">
                             書く
-                        </Link>
+                        </AppLink>
                         <button
                             onClick={() => setIsLogoutConfirmOpen(true)}
                             className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
@@ -102,7 +102,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 }
             />
 
-            <article className="mx-auto max-w-3xl px-4 pb-28 pt-8 sm:pb-8">
+            <article className="mx-auto max-w-3xl px-4 pb-36 pt-8 sm:pb-8">
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5 sm:p-10">
                     <div className="mb-8 flex items-center gap-3">
                         <Avatar profile={diary.author} fallback={authorName} size="lg" />

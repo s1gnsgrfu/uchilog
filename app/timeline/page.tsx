@@ -1,11 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
+import { AppLink } from '../components/AppLink'
 import { Avatar } from '../components/Avatar'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
@@ -218,12 +218,12 @@ export default function TimelinePage() {
             <AppHeader
                 actions={
                     <>
-                        <Link
+                        <AppLink
                             href="/write"
                             className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
                         >
                             書く
-                        </Link>
+                        </AppLink>
                         <button
                             onClick={() => setIsLogoutConfirmOpen(true)}
                             className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
@@ -234,7 +234,7 @@ export default function TimelinePage() {
                 }
             />
 
-            <section className="mx-auto max-w-3xl px-3 pb-28 pt-6 sm:pb-6">
+            <section className="mx-auto max-w-3xl px-3 pb-36 pt-6 sm:pb-6">
                 {message && <p className="mb-4 rounded-xl bg-white px-4 py-3 text-sm text-red-600 shadow-sm">{message}</p>}
 
                 {groupedDiaries.length === 0 ? (
@@ -266,7 +266,7 @@ export default function TimelinePage() {
 
                                             <div className={`max-w-[76%] ${isOwn ? 'text-right' : 'text-left'}`}>
                                                 <p className="mb-1 px-1 text-xs font-semibold text-zinc-500">{authorName}</p>
-                                                <Link
+                                                <AppLink
                                                     href={`/diary/${diary.id}`}
                                                     className={`block space-y-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold leading-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                                                         isOwn
@@ -285,7 +285,7 @@ export default function TimelinePage() {
                                                             className="h-20 w-28 rounded-xl object-cover ring-1 ring-black/5"
                                                         />
                                                     )}
-                                                </Link>
+                                                </AppLink>
                                             </div>
 
                                             {isOwn && <Avatar profile={profile} fallback={authorName} />}

@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
+import { AppLink } from '../components/AppLink'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { MobileNav } from '../components/MobileNav'
@@ -168,9 +168,9 @@ export default function WritePage() {
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
                 <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
                     <p className="font-semibold text-zinc-900">ログインが必要です</p>
-                    <Link href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
+                    <AppLink href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
                         タイムラインへ
-                    </Link>
+                    </AppLink>
                 </section>
             </main>
         )
@@ -189,7 +189,7 @@ export default function WritePage() {
                 }
             />
 
-            <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-28 pt-6 sm:pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+            <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-36 pt-6 sm:pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
                 <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                     <div className="flex flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>

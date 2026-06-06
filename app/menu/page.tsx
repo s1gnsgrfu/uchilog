@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { AppHeader } from '../components/AppHeader'
+import { AppLink } from '../components/AppLink'
 import { Avatar } from '../components/Avatar'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
@@ -141,9 +141,9 @@ export default function MenuPage() {
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
                 <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
                     <p className="font-semibold text-zinc-900">ログインが必要です</p>
-                    <Link href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
+                    <AppLink href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
                         タイムラインへ
-                    </Link>
+                    </AppLink>
                 </section>
             </main>
         )
@@ -164,7 +164,7 @@ export default function MenuPage() {
                 }
             />
 
-            <section className="mx-auto max-w-3xl space-y-5 px-4 pb-28 pt-6 sm:pb-8">
+            <section className="mx-auto max-w-3xl space-y-5 px-4 pb-36 pt-6 sm:pb-8">
                 {message && (
                     <p className="rounded-xl bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm ring-1 ring-black/5">
                         {message}
