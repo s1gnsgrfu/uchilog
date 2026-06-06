@@ -117,7 +117,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
             </article>
 
-            <MobileNav onMenuClick={() => setIsLogoutConfirmOpen(true)} />
+            <MobileNav />
 
             {isLogoutConfirmOpen && (
                 <LogoutConfirmDialog

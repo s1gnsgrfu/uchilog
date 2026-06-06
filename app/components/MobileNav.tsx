@@ -1,12 +1,11 @@
 import Link from 'next/link'
 
 type MobileNavProps = {
-    active?: 'timeline' | 'write'
-    onMenuClick: () => void
+    active?: 'timeline' | 'write' | 'menu'
 }
 
-export function MobileNav({ active, onMenuClick }: MobileNavProps) {
-    const linkClass = (name: 'timeline' | 'write') =>
+export function MobileNav({ active }: MobileNavProps) {
+    const linkClass = (name: 'timeline' | 'write' | 'menu') =>
         `flex flex-1 flex-col items-center rounded-xl px-3 py-2 text-sm font-semibold transition ${
             active === name ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950'
         }`
@@ -20,12 +19,9 @@ export function MobileNav({ active, onMenuClick }: MobileNavProps) {
                 <Link href="/write" className={linkClass('write')}>
                     書く
                 </Link>
-                <button
-                    onClick={onMenuClick}
-                    className="flex flex-1 flex-col items-center rounded-xl px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
-                >
+                <Link href="/menu" className={linkClass('menu')}>
                     メニュー
-                </button>
+                </Link>
             </div>
         </nav>
     )

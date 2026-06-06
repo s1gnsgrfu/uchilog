@@ -243,7 +243,7 @@ export default function WritePage() {
                 </div>
             )}
 
-            <MobileNav active="write" onMenuClick={() => setIsLogoutConfirmOpen(true)} />
+            <MobileNav active="write" />
 
             {isLogoutConfirmOpen && (
                 <LogoutConfirmDialog

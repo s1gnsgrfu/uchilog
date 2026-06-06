@@ -294,7 +294,7 @@ export default function TimelinePage() {
                 </div>
             )}
 
-            <MobileNav active="timeline" onMenuClick={() => setIsLogoutConfirmOpen(true)} />
+            <MobileNav active="timeline" />
 
             {isLogoutConfirmOpen && (
                 <LogoutConfirmDialog
