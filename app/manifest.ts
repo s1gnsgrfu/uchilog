@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
         scope: '/',
         display: 'standalone',
         background_color: '#f6f1e8',
-        theme_color: '#f6f1e8',
+        theme_color: '#fbf9f4',
         icons: [
             {
                 src: '/uchilog-icon.svg',
