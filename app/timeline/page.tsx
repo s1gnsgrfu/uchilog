@@ -32,6 +32,7 @@ export default function TimelinePage() {
     const [diaries, setDiaries] = useState<DiaryWithAuthor[]>([])
     const [message, setMessage] = useState('')
     const [isLoading, setIsLoading] = useState(true)
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
 
     const fetchTimeline = useCallback(async (currentUser: User, currentProfile: Profile | null) => {
         const { data, error } = await supabase
@@ -176,6 +177,7 @@ export default function TimelinePage() {
         setUser(null)
         setProfile(null)
         setDiaries([])
+        setIsLogoutConfirmOpen(false)
     }
 
     if (isLoading) {
@@ -217,7 +219,10 @@ export default function TimelinePage() {
                         >
                             書く
                         </Link>
-                        <button onClick={logout} className="text-sm font-medium text-zinc-600 hover:text-zinc-950">
+                        <button
+                            onClick={() => setIsLogoutConfirmOpen(true)}
+                            className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
+                        >
                             ログアウト
                         </button>
                     </>
@@ -276,6 +281,42 @@ export default function TimelinePage() {
                     </div>
                 )}
             </section>
+
+            {isLogoutConfirmOpen && (
+                <div
+                    onClick={() => setIsLogoutConfirmOpen(false)}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-6"
+                >
+                    <section
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="logout-confirm-title"
+                        onClick={(event) => event.stopPropagation()}
+                        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+                    >
+                        <h2 id="logout-confirm-title" className="text-lg font-bold text-zinc-950">
+                            ログアウトしますか？
+                        </h2>
+                        <p className="mt-2 text-sm leading-6 text-zinc-500">
+                            もう一度Discordログインするまで、日記の投稿やタイムライン表示はできません。
+                        </p>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button
+                                onClick={() => setIsLogoutConfirmOpen(false)}
+                                className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={logout}
+                                className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                            >
+                                ログアウト
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            )}
         </main>
     )
 }
