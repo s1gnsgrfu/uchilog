@@ -1,20 +1,25 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { use, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AppHeader } from '../../components/AppHeader'
 import { Avatar } from '../../components/Avatar'
+import { LogoutConfirmDialog } from '../../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../../components/MarkdownRenderer'
+import { MobileNav } from '../../components/MobileNav'
 import { formatDateTime } from '../../utils/format'
 import { fetchProfilesByIds } from '../../utils/profiles'
 import type { Diary, DiaryWithAuthor } from '../../utils/types'
 
 export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
+    const router = useRouter()
     const [diary, setDiary] = useState<DiaryWithAuthor | null>(null)
     const [message, setMessage] = useState('')
     const [isLoading, setIsLoading] = useState(true)
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
 
     useEffect(() => {
         const load = async () => {
@@ -42,6 +47,18 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
 
         load()
     }, [id])
+
+    const logout = async () => {
+        const { error } = await supabase.auth.signOut()
+
+        if (error) {
+            setMessage('ログアウトに失敗しました')
+            return
+        }
+
+        setIsLogoutConfirmOpen(false)
+        router.replace('/timeline')
+    }
 
     if (isLoading) {
         return (
@@ -71,13 +88,21 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         <main className="min-h-screen bg-[#f6f1e8]">
             <AppHeader
                 actions={
-                    <Link href="/write" className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white">
-                        書く
-                    </Link>
+                    <>
+                        <Link href="/write" className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white">
+                            書く
+                        </Link>
+                        <button
+                            onClick={() => setIsLogoutConfirmOpen(true)}
+                            className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
+                        >
+                            ログアウト
+                        </button>
+                    </>
                 }
             />
 
-            <article className="mx-auto max-w-3xl px-4 py-8">
+            <article className="mx-auto max-w-3xl px-4 pb-28 pt-8 sm:pb-8">
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5 sm:p-10">
                     <div className="mb-8 flex items-center gap-3">
                         <Avatar profile={diary.author} fallback={authorName} size="lg" />
@@ -91,6 +116,15 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                     <MarkdownRenderer body={diary.body} />
                 </div>
             </article>
+
+            <MobileNav onMenuClick={() => setIsLogoutConfirmOpen(true)} />
+
+            {isLogoutConfirmOpen && (
+                <LogoutConfirmDialog
+                    onCancel={() => setIsLogoutConfirmOpen(false)}
+                    onConfirm={logout}
+                />
+            )}
         </main>
     )
 }

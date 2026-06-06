@@ -12,7 +12,7 @@ export function AppHeader({ actions }: AppHeaderProps) {
                 <Link href="/timeline" className="shrink-0 font-bold text-zinc-950">
                     UchiLog
                 </Link>
-                {actions && <div className="flex min-w-0 items-center gap-2">{actions}</div>}
+                {actions && <div className="hidden min-w-0 items-center gap-2 sm:flex">{actions}</div>}
             </div>
         </header>
     )

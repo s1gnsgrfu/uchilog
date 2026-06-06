@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
+import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
+import { MobileNav } from '../components/MobileNav'
 import { syncProfile } from '../utils/profiles'
 
 export default function WritePage() {
@@ -19,6 +21,7 @@ export default function WritePage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isHelpOpen, setIsHelpOpen] = useState(false)
     const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
 
     const markdownTips = [
         {
@@ -136,6 +139,19 @@ export default function WritePage() {
         setIsHelpOpen(false)
     }
 
+    const logout = async () => {
+        const { error } = await supabase.auth.signOut()
+
+        if (error) {
+            setMessage('ログアウトに失敗しました')
+            return
+        }
+
+        setUser(null)
+        setIsLogoutConfirmOpen(false)
+        router.replace('/timeline')
+    }
+
     if (!isCheckingAuth && !user) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
@@ -153,27 +169,39 @@ export default function WritePage() {
         <main className="min-h-screen bg-[#f6f1e8]">
             <AppHeader
                 actions={
-                    <>
-                        <button
-                            onClick={() => setIsHelpOpen(true)}
-                            disabled={isCheckingAuth}
-                            className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950"
-                        >
-                            書き方ヘルプ
-                        </button>
-                        <button
-                            onClick={createDiary}
-                            disabled={isSubmitting || isCheckingAuth}
-                            className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
-                        >
-                            {isSubmitting ? '投稿中' : '投稿する'}
-                        </button>
-                    </>
+                    <button
+                        onClick={() => setIsLogoutConfirmOpen(true)}
+                        className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
+                    >
+                        ログアウト
+                    </button>
                 }
             />
 
-            <section className="mx-auto grid max-w-5xl gap-5 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+            <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-28 pt-6 sm:pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
                 <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                    <div className="flex flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h1 className="text-xl font-bold text-zinc-950">日記を書く</h1>
+                            <p className="mt-1 text-sm text-zinc-500">タイトルと本文を、ゆっくり書けます。</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setIsHelpOpen(true)}
+                                disabled={isCheckingAuth}
+                                className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950"
+                            >
+                                書き方ヘルプ
+                            </button>
+                            <button
+                                onClick={createDiary}
+                                disabled={isSubmitting || isCheckingAuth}
+                                className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
+                            >
+                                {isSubmitting ? '投稿中' : '投稿する'}
+                            </button>
+                        </div>
+                    </div>
                     <input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
@@ -213,6 +241,15 @@ export default function WritePage() {
                         className="h-10 w-10 animate-spin rounded-full border-4 border-white/60 border-t-zinc-950"
                     />
                 </div>
+            )}
+
+            <MobileNav active="write" onMenuClick={() => setIsLogoutConfirmOpen(true)} />
+
+            {isLogoutConfirmOpen && (
+                <LogoutConfirmDialog
+                    onCancel={() => setIsLogoutConfirmOpen(false)}
+                    onConfirm={logout}
+                />
             )}
 
             {isHelpOpen && (
