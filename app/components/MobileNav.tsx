@@ -11,7 +11,7 @@ export function MobileNav({ active }: MobileNavProps) {
         }`
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/90 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/90 px-3 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden">
             <div className="mx-auto flex max-w-md items-center gap-2">
                 <AppLink href="/timeline" className={linkClass('timeline')}>
                     タイムライン

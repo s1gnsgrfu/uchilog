@@ -164,7 +164,7 @@ export default function MenuPage() {
                 }
             />
 
-            <section className="mx-auto max-w-3xl space-y-5 px-4 pb-28 pt-6 sm:pb-8">
+            <section className="mx-auto max-w-3xl space-y-5 px-4 pb-36 pt-6 sm:pb-8">
                 {message && (
                     <p className="rounded-xl bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm ring-1 ring-black/5">
                         {message}

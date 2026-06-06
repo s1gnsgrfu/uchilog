@@ -234,7 +234,7 @@ export default function TimelinePage() {
                 }
             />
 
-            <section className="mx-auto max-w-3xl px-3 pb-28 pt-6 sm:pb-6">
+            <section className="mx-auto max-w-3xl px-3 pb-36 pt-6 sm:pb-6">
                 {message && <p className="mb-4 rounded-xl bg-white px-4 py-3 text-sm text-red-600 shadow-sm">{message}</p>}
 
                 {groupedDiaries.length === 0 ? (

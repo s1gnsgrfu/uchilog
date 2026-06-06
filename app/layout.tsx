@@ -19,15 +19,17 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "UchiLog",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
   },
 };
 
 export const viewport: Viewport = {
   themeColor: "#f6f1e8",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -38,9 +40,9 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full bg-[#f6f1e8] antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full bg-[#f6f1e8] flex flex-col">{children}</body>
     </html>
   );
 }
