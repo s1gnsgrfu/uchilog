@@ -1,0 +1,37 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "uchilog",
+	"compatibility_date": "2026-05-27",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "uchilog"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	},
+	"env": {
+		"dev": {
+			"name": "uchilog-dev",
+			"services": [
+				{
+					"binding": "WORKER_SELF_REFERENCE",
+					"service": "uchilog-dev"
+				}
+			],
+			"images": {
+        		"binding": "IMAGES"
+      		}
+		}
+	}
+}
