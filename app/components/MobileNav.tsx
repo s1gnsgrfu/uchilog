@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { AppLink } from './AppLink'
 
 type MobileNavProps = {
     active?: 'timeline' | 'write' | 'menu'
@@ -13,15 +13,15 @@ export function MobileNav({ active }: MobileNavProps) {
     return (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/90 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden">
             <div className="mx-auto flex max-w-md items-center gap-2">
-                <Link href="/timeline" className={linkClass('timeline')}>
+                <AppLink href="/timeline" className={linkClass('timeline')}>
                     タイムライン
-                </Link>
-                <Link href="/write" className={linkClass('write')}>
+                </AppLink>
+                <AppLink href="/write" className={linkClass('write')}>
                     書く
-                </Link>
-                <Link href="/menu" className={linkClass('menu')}>
+                </AppLink>
+                <AppLink href="/menu" className={linkClass('menu')}>
                     メニュー
-                </Link>
+                </AppLink>
             </div>
         </nav>
     )
