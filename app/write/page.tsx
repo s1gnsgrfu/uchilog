@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
+import { AppLink } from '../components/AppLink'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { MobileNav } from '../components/MobileNav'
@@ -168,9 +168,9 @@ export default function WritePage() {
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
                 <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
                     <p className="font-semibold text-zinc-900">ログインが必要です</p>
-                    <Link href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
+                    <AppLink href="/timeline" className="mt-5 inline-flex rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white">
                         タイムラインへ
-                    </Link>
+                    </AppLink>
                 </section>
             </main>
         )
