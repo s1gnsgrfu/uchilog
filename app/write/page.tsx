@@ -156,20 +156,20 @@ export default function WritePage() {
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         placeholder="タイトル"
-                        className="w-full border-b border-zinc-200 px-1 pb-4 text-3xl font-bold outline-none placeholder:text-zinc-300"
+                        className="w-full border-b border-zinc-200 px-1 pb-4 text-3xl font-bold text-zinc-950 outline-none placeholder:text-zinc-500"
                     />
                     <input
                         value={imageUrl}
                         onChange={(event) => setImageUrl(event.target.value)}
                         placeholder="画像URL"
-                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm outline-none focus:border-zinc-400"
+                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
                     <textarea
                         value={body}
                         onChange={(event) => setBody(event.target.value)}
                         placeholder="# 今日のこと&#10;&#10;本文をMarkdownで書けます。"
                         rows={18}
-                        className="w-full resize-y rounded-xl border border-zinc-200 px-4 py-3 leading-7 outline-none focus:border-zinc-400"
+                        className="w-full resize-y rounded-xl border border-zinc-200 px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
                     {message && <p className="text-sm text-red-600">{message}</p>}
                 </div>
