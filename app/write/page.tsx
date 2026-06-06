@@ -196,7 +196,7 @@ export default function WritePage() {
                             <h1 className="text-xl font-bold text-zinc-950">日記を書く</h1>
                             <p className="mt-1 text-sm text-zinc-500">タイトルと本文を、ゆっくり書けます。</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                             <button
                                 onClick={() => setIsHelpOpen(true)}
                                 disabled={isCheckingAuth}
