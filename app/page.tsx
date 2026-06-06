@@ -14,6 +14,19 @@ export default function Home() {
     const [editBody, setEditBody] = useState('')
     const [savingId, setSavingId] = useState<string | null>(null)
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [profile, setProfile] = useState<Profile | null>(null)
+    const [profileDisplayName, setProfileDisplayName] = useState('')
+    const [profileBio, setProfileBio] = useState('')
+    const [profileAvatarUrl, setProfileAvatarUrl] = useState('')
+    const [isSavingProfile, setIsSavingProfile] = useState(false)
+    type Profile = {
+        id: string
+        display_name: string | null
+        avatar_url: string | null
+        bio: string | null
+        created_at: string
+        updated_at: string
+    }
     type Diary = {
         id: string
         user_id: string
@@ -23,6 +36,76 @@ export default function Home() {
         updated_at: string
     }
     const [diaries, setDiaries] = useState<Diary[]>([])
+
+    const setProfileForm = useCallback((nextProfile: Profile) => {
+        setProfile(nextProfile)
+        setProfileDisplayName(nextProfile.display_name ?? '')
+        setProfileBio(nextProfile.bio ?? '')
+        setProfileAvatarUrl(nextProfile.avatar_url ?? '')
+    }, [])
+
+    const syncProfile = useCallback(async (currentUser: User) => {
+        const { data: existingProfile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+
+        if (fetchError) {
+            setMessage(`プロフィールの取得に失敗しました: ${fetchError.message}`)
+            return
+        }
+
+        if (existingProfile) {
+            setProfileForm(existingProfile)
+            return
+        }
+
+        const metadata = currentUser.user_metadata as {
+            avatar_url?: string
+            full_name?: string
+            name?: string
+            picture?: string
+        }
+
+        const { data: createdProfile, error: insertError } = await supabase
+            .from('profiles')
+            .upsert({
+                id: currentUser.id,
+                display_name: metadata.full_name ?? metadata.name ?? currentUser.email ?? '名無し',
+                avatar_url: metadata.avatar_url ?? metadata.picture ?? null,
+            }, {
+                ignoreDuplicates: true,
+                onConflict: 'id',
+            })
+            .select()
+            .maybeSingle()
+
+        if (insertError) {
+            setMessage(`プロフィールの作成に失敗しました: ${insertError.message}`)
+            return
+        }
+
+        if (createdProfile) {
+            setProfileForm(createdProfile)
+            return
+        }
+
+        const { data: duplicateProfile, error: duplicateFetchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+
+        if (duplicateFetchError) {
+            setMessage(`プロフィールの再取得に失敗しました: ${duplicateFetchError.message}`)
+            return
+        }
+
+        if (duplicateProfile) {
+            setProfileForm(duplicateProfile)
+        }
+    }, [setProfileForm])
 
     const fetchDiaries = useCallback(async () => {
         const { data, error } = await supabase
@@ -49,12 +132,13 @@ export default function Home() {
 
             setUser(data.user)
             if (data.user) {
+                await syncProfile(data.user)
                 await fetchDiaries()
             }
         }
 
         getUser()
-    }, [fetchDiaries])
+    }, [fetchDiaries, syncProfile])
 
     const loginWithDiscord = async () => {
         const { error } = await supabase.auth.signInWithOAuth({
@@ -78,8 +162,45 @@ export default function Home() {
         }
 
         setUser(null)
+        setProfile(null)
         setDiaries([])
         cancelEdit()
+    }
+
+    const updateProfile = async () => {
+        if (!user) {
+            setMessage('ログインしてください')
+            return
+        }
+
+        if (!profileDisplayName.trim()) {
+            setMessage('表示名を入力してください')
+            return
+        }
+
+        setIsSavingProfile(true)
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .upsert({
+                id: user.id,
+                display_name: profileDisplayName,
+                bio: profileBio || null,
+                avatar_url: profileAvatarUrl || null,
+                updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single()
+
+        setIsSavingProfile(false)
+
+        if (error) {
+            setMessage(`プロフィールの保存に失敗しました: ${error.message}`)
+            return
+        }
+
+        setProfileForm(data)
+        setMessage('プロフィールを保存しました')
     }
 
     const createDiary = async () => {
@@ -183,7 +304,22 @@ export default function Home() {
             {user ? (
                 <div className="space-y-6">
                     <div className="space-y-2 rounded border p-4">
-                        <p>ログイン中</p>
+                        <div className="flex items-center gap-3">
+                            {profile?.avatar_url ? (
+                                <div
+                                    className="h-12 w-12 rounded-full bg-cover bg-center"
+                                    style={{ backgroundImage: `url(${profile.avatar_url})` }}
+                                />
+                            ) : (
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-sm text-gray-600">
+                                    {profile?.display_name?.slice(0, 1) ?? 'u'}
+                                </div>
+                            )}
+                            <div>
+                                <p className="font-bold">{profile?.display_name ?? 'ログイン中'}</p>
+                                <p className="text-sm text-gray-600">{profile?.bio ?? 'プロフィール未設定'}</p>
+                            </div>
+                        </div>
                         <p className="break-all text-sm text-gray-600">User ID: {user.id}</p>
                         <p className="text-sm text-gray-600">Email: {user.email}</p>
                         <button
@@ -193,6 +329,40 @@ export default function Home() {
                             ログアウト
                         </button>
                     </div>
+
+                    <section className="space-y-4 rounded border p-4">
+                        <h2 className="text-xl font-bold">プロフィール</h2>
+
+                        <input
+                            value={profileDisplayName}
+                            onChange={(e) => setProfileDisplayName(e.target.value)}
+                            placeholder="表示名"
+                            className="w-full rounded border p-2"
+                        />
+
+                        <input
+                            value={profileAvatarUrl}
+                            onChange={(e) => setProfileAvatarUrl(e.target.value)}
+                            placeholder="アバターURL"
+                            className="w-full rounded border p-2"
+                        />
+
+                        <textarea
+                            value={profileBio}
+                            onChange={(e) => setProfileBio(e.target.value)}
+                            placeholder="自己紹介"
+                            rows={4}
+                            className="w-full rounded border p-2"
+                        />
+
+                        <button
+                            onClick={updateProfile}
+                            disabled={isSavingProfile}
+                            className="rounded bg-black px-4 py-2 text-white disabled:bg-gray-400"
+                        >
+                            {isSavingProfile ? '保存中' : 'プロフィールを保存'}
+                        </button>
+                    </section>
 
                     <section className="space-y-4 rounded border p-4">
                         <h2 className="text-xl font-bold">日記を書く</h2>
