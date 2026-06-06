@@ -18,6 +18,7 @@ export default function WritePage() {
     const [body, setBody] = useState('')
     const [imageUrl, setImageUrl] = useState('')
     const [message, setMessage] = useState('')
+    const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isHelpOpen, setIsHelpOpen] = useState(false)
     const [isCheckingAuth, setIsCheckingAuth] = useState(true)
@@ -105,11 +106,19 @@ export default function WritePage() {
             return
         }
 
-        if (!title.trim() || !body.trim()) {
-            setMessage('タイトルと本文を入力してください')
+        const nextFieldErrors = {
+            title: title.trim() ? '' : 'タイトルを入力してください',
+            body: body.trim() ? '' : '本文を入力してください',
+        }
+
+        if (nextFieldErrors.title || nextFieldErrors.body) {
+            setFieldErrors(nextFieldErrors)
+            setMessage('未入力の項目があります')
             return
         }
 
+        setFieldErrors({ title: '', body: '' })
+        setMessage('')
         setIsSubmitting(true)
 
         const { error } = await supabase.from('diaries').insert({
@@ -136,6 +145,8 @@ export default function WritePage() {
 
             return `${currentBody.trimEnd()}\n\n${example}`
         })
+        setFieldErrors((currentErrors) => ({ ...currentErrors, body: '' }))
+        setMessage('')
         setIsHelpOpen(false)
     }
 
@@ -202,13 +213,30 @@ export default function WritePage() {
                             </button>
                         </div>
                     </div>
+                    {message && (
+                        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-100">
+                            {message}
+                        </p>
+                    )}
                     <input
                         value={title}
-                        onChange={(event) => setTitle(event.target.value)}
+                        onChange={(event) => {
+                            setTitle(event.target.value)
+                            if (fieldErrors.title) {
+                                setFieldErrors((currentErrors) => ({ ...currentErrors, title: '' }))
+                            }
+                            if (message === '未入力の項目があります') {
+                                setMessage('')
+                            }
+                        }}
                         placeholder="タイトル"
                         disabled={isCheckingAuth}
-                        className="w-full border-b border-zinc-200 px-1 pb-4 text-3xl font-bold text-zinc-950 outline-none placeholder:text-zinc-500"
+                        aria-invalid={Boolean(fieldErrors.title)}
+                        className={`w-full border-b px-1 pb-4 text-3xl font-bold text-zinc-950 outline-none placeholder:text-zinc-500 ${
+                            fieldErrors.title ? 'border-red-400' : 'border-zinc-200'
+                        }`}
                     />
+                    {fieldErrors.title && <p className="-mt-2 text-sm font-semibold text-red-600">{fieldErrors.title}</p>}
                     <input
                         value={imageUrl}
                         onChange={(event) => setImageUrl(event.target.value)}
@@ -216,15 +244,26 @@ export default function WritePage() {
                         disabled={isCheckingAuth}
                         className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
+                    {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
                     <textarea
                         value={body}
-                        onChange={(event) => setBody(event.target.value)}
+                        onChange={(event) => {
+                            setBody(event.target.value)
+                            if (fieldErrors.body) {
+                                setFieldErrors((currentErrors) => ({ ...currentErrors, body: '' }))
+                            }
+                            if (message === '未入力の項目があります') {
+                                setMessage('')
+                            }
+                        }}
                         placeholder="# 今日のこと&#10;&#10;本文をMarkdownで書けます。"
                         rows={18}
                         disabled={isCheckingAuth}
-                        className="w-full resize-y rounded-xl border border-zinc-200 px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
+                        aria-invalid={Boolean(fieldErrors.body)}
+                        className={`w-full resize-y rounded-xl border px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400 ${
+                            fieldErrors.body ? 'border-red-400' : 'border-zinc-200'
+                        }`}
                     />
-                    {message && <p className="text-sm text-red-600">{message}</p>}
                 </div>
 
                 <aside className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
