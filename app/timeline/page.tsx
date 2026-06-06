@@ -180,14 +180,6 @@ export default function TimelinePage() {
         setIsLogoutConfirmOpen(false)
     }
 
-    if (isLoading) {
-        return (
-            <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5 text-zinc-600">
-                タイムラインを読み込み中
-            </main>
-        )
-    }
-
     if (!user) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
@@ -204,6 +196,15 @@ export default function TimelinePage() {
                     </button>
                     {message && <p className="text-sm text-red-600">{message}</p>}
                 </section>
+
+                {isLoading && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-5 backdrop-blur-[1px]">
+                        <div
+                            aria-label="読み込み中"
+                            className="h-10 w-10 animate-spin rounded-full border-4 border-white/60 border-t-zinc-950"
+                        />
+                    </div>
+                )}
             </main>
         )
     }
@@ -281,6 +282,15 @@ export default function TimelinePage() {
                     </div>
                 )}
             </section>
+
+            {isLoading && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-5 backdrop-blur-[1px]">
+                    <div
+                        aria-label="読み込み中"
+                        className="h-10 w-10 animate-spin rounded-full border-4 border-white/60 border-t-zinc-950"
+                    />
+                </div>
+            )}
 
             {isLogoutConfirmOpen && (
                 <div

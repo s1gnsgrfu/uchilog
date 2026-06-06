@@ -18,6 +18,7 @@ export default function WritePage() {
     const [message, setMessage] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isHelpOpen, setIsHelpOpen] = useState(false)
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
     const markdownTips = [
         {
@@ -53,16 +54,38 @@ export default function WritePage() {
     ]
 
     useEffect(() => {
-        const load = async () => {
-            const { data } = await supabase.auth.getUser()
-            setUser(data.user)
+        let isMounted = true
 
-            if (data.user) {
-                await syncProfile(data.user)
+        const load = async () => {
+            try {
+                const { data } = await supabase.auth.getSession()
+                const sessionUser = data.session?.user ?? null
+
+                if (!isMounted) {
+                    return
+                }
+
+                setUser(sessionUser)
+
+                if (sessionUser) {
+                    await syncProfile(sessionUser)
+                }
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : '不明なエラー'
+                setMessage(`ログイン状態の確認に失敗しました: ${errorMessage}`)
+                setUser(null)
+            } finally {
+                if (isMounted) {
+                    setIsCheckingAuth(false)
+                }
             }
         }
 
         load()
+
+        return () => {
+            isMounted = false
+        }
     }, [])
 
     const composedBody = useMemo(() => {
@@ -113,7 +136,7 @@ export default function WritePage() {
         setIsHelpOpen(false)
     }
 
-    if (!user) {
+    if (!isCheckingAuth && !user) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
                 <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
@@ -133,13 +156,14 @@ export default function WritePage() {
                     <>
                         <button
                             onClick={() => setIsHelpOpen(true)}
+                            disabled={isCheckingAuth}
                             className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950"
                         >
                             書き方ヘルプ
                         </button>
                         <button
                             onClick={createDiary}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isCheckingAuth}
                             className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
                         >
                             {isSubmitting ? '投稿中' : '投稿する'}
@@ -154,12 +178,14 @@ export default function WritePage() {
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         placeholder="タイトル"
+                        disabled={isCheckingAuth}
                         className="w-full border-b border-zinc-200 px-1 pb-4 text-3xl font-bold text-zinc-950 outline-none placeholder:text-zinc-500"
                     />
                     <input
                         value={imageUrl}
                         onChange={(event) => setImageUrl(event.target.value)}
                         placeholder="画像URL"
+                        disabled={isCheckingAuth}
                         className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
                     <textarea
@@ -167,6 +193,7 @@ export default function WritePage() {
                         onChange={(event) => setBody(event.target.value)}
                         placeholder="# 今日のこと&#10;&#10;本文をMarkdownで書けます。"
                         rows={18}
+                        disabled={isCheckingAuth}
                         className="w-full resize-y rounded-xl border border-zinc-200 px-4 py-3 leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
                     {message && <p className="text-sm text-red-600">{message}</p>}
@@ -178,6 +205,15 @@ export default function WritePage() {
                     <MarkdownRenderer body={composedBody || '本文のプレビューがここに表示されます。'} />
                 </aside>
             </section>
+
+            {isCheckingAuth && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-5 backdrop-blur-[1px]">
+                    <div
+                        aria-label="読み込み中"
+                        className="h-10 w-10 animate-spin rounded-full border-4 border-white/60 border-t-zinc-950"
+                    />
+                </div>
+            )}
 
             {isHelpOpen && (
                 <div
