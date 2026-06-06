@@ -9,6 +9,22 @@ import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
 import { formatDateLabel, getDateKey } from '../utils/format'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
 
+const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs = 10000) => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const timeout = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs)
+    })
+
+    try {
+        return await Promise.race([promise, timeout])
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId)
+        }
+    }
+}
+
 export default function TimelinePage() {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
@@ -46,34 +62,71 @@ export default function TimelinePage() {
     }, [])
 
     useEffect(() => {
+        let isMounted = true
+
         const load = async () => {
             setIsLoading(true)
-
-            const { data, error } = await supabase.auth.getUser()
-
-            if (error || !data.user) {
-                setUser(null)
-                setProfile(null)
-                setDiaries([])
-                setIsLoading(false)
-                return
-            }
-
-            setUser(data.user)
+            let sessionUser: User | null = null
 
             try {
-                const syncedProfile = await syncProfile(data.user)
+                const { data, error } = await withTimeout(
+                    supabase.auth.getSession(),
+                    'ログイン状態の確認に時間がかかっています'
+                )
+
+                if (!isMounted) {
+                    return
+                }
+
+                sessionUser = data.session?.user ?? null
+
+                if (error || !sessionUser) {
+                    setUser(null)
+                    setProfile(null)
+                    setDiaries([])
+                    setIsLoading(false)
+                    return
+                }
+
+                setUser(sessionUser)
+
+                const syncedProfile = await withTimeout(
+                    syncProfile(sessionUser),
+                    'プロフィールの読み込みに時間がかかっています'
+                )
+
+                if (!isMounted) {
+                    return
+                }
+
                 setProfile(syncedProfile)
-                await fetchTimeline(data.user, syncedProfile)
-            } catch (syncError) {
-                const errorMessage = syncError instanceof Error ? syncError.message : '不明なエラー'
-                setMessage(`プロフィールの同期に失敗しました: ${errorMessage}`)
+
+                await withTimeout(
+                    fetchTimeline(sessionUser, syncedProfile),
+                    'タイムラインの読み込みに時間がかかっています'
+                )
+            } catch (loadError) {
+                if (!isMounted) {
+                    return
+                }
+
+                const errorMessage = loadError instanceof Error ? loadError.message : '不明なエラー'
+                setMessage(errorMessage)
+                setUser(sessionUser)
+                setProfile(null)
+                setDiaries([])
             } finally {
-                setIsLoading(false)
+                if (isMounted) {
+                    setIsLoading(false)
+                }
             }
         }
 
         load()
+
+        return () => {
+            isMounted = false
+        }
     }, [fetchTimeline])
 
     const groupedDiaries = useMemo(() => {

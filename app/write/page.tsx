@@ -16,6 +16,40 @@ export default function WritePage() {
     const [imageUrl, setImageUrl] = useState('')
     const [message, setMessage] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isHelpOpen, setIsHelpOpen] = useState(false)
+
+    const markdownTips = [
+        {
+            label: '見出し',
+            description: '話題を区切る大きなタイトルになります。',
+            example: '## 今日のハイライト',
+        },
+        {
+            label: '太字',
+            description: '大事な言葉を強調できます。',
+            example: '**これは大事**',
+        },
+        {
+            label: 'リスト',
+            description: 'できごとを箇条書きにできます。',
+            example: '- 朝に散歩した\n- お昼に友だちと話した',
+        },
+        {
+            label: '引用',
+            description: '誰かの言葉や印象に残った一文に使えます。',
+            example: '> 今日はよくがんばった',
+        },
+        {
+            label: '画像',
+            description: '画像URLを本文の好きな位置に入れられます。',
+            example: '![写真の説明](https://example.com/image.jpg)',
+        },
+        {
+            label: 'コード',
+            description: 'メモしたコマンドやコードを読みやすく表示します。',
+            example: '```\nnpm run dev\n```',
+        },
+    ]
 
     useEffect(() => {
         const load = async () => {
@@ -67,6 +101,17 @@ export default function WritePage() {
         router.push('/timeline')
     }
 
+    const insertMarkdown = (example: string) => {
+        setBody((currentBody) => {
+            if (!currentBody.trim()) {
+                return example
+            }
+
+            return `${currentBody.trimEnd()}\n\n${example}`
+        })
+        setIsHelpOpen(false)
+    }
+
     if (!user) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
@@ -87,13 +132,21 @@ export default function WritePage() {
                     <Link href="/timeline" className="font-bold text-zinc-950">
                         UchiLog
                     </Link>
-                    <button
-                        onClick={createDiary}
-                        disabled={isSubmitting}
-                        className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
-                    >
-                        {isSubmitting ? '投稿中' : '投稿する'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setIsHelpOpen(true)}
+                            className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950"
+                        >
+                            書き方ヘルプ
+                        </button>
+                        <button
+                            onClick={createDiary}
+                            disabled={isSubmitting}
+                            className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
+                        >
+                            {isSubmitting ? '投稿中' : '投稿する'}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -127,6 +180,54 @@ export default function WritePage() {
                     <MarkdownRenderer body={composedBody || '本文のプレビューがここに表示されます。'} />
                 </aside>
             </section>
+
+            {isHelpOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-6">
+                    <section
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="markdown-help-title"
+                        className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+                    >
+                        <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-4">
+                            <div>
+                                <h2 id="markdown-help-title" className="text-xl font-bold text-zinc-950">
+                                    Markdownの書き方
+                                </h2>
+                                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                                    よく使う形だけ覚えれば大丈夫です。例を押すと本文に追加できます。
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsHelpOpen(false)}
+                                className="rounded-full border border-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950"
+                            >
+                                閉じる
+                            </button>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {markdownTips.map((tip) => (
+                                <article key={tip.label} className="rounded-xl border border-zinc-200 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <h3 className="font-bold text-zinc-950">{tip.label}</h3>
+                                        <button
+                                            onClick={() => insertMarkdown(tip.example)}
+                                            className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
+                                        >
+                                            入れる
+                                        </button>
+                                    </div>
+                                    <p className="mt-2 text-sm leading-6 text-zinc-500">{tip.description}</p>
+                                    <pre className="mt-3 overflow-x-auto rounded-lg bg-zinc-100 p-3 text-sm text-zinc-800">
+                                        <code>{tip.example}</code>
+                                    </pre>
+                                </article>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            )}
         </main>
     )
 }
