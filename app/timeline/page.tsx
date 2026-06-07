@@ -41,6 +41,10 @@ export default function TimelinePage() {
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
     const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
 
+    const scrollToLatest = useCallback(() => {
+        timelineEndRef.current?.scrollIntoView({ block: 'end' })
+    }, [])
+
     const fetchTimeline = useCallback(async (currentUser: User, currentProfile: Profile | null) => {
         const { data, error } = await supabase
             .from('diaries')
@@ -147,18 +151,12 @@ export default function TimelinePage() {
             return
         }
 
-        const scrollToLatest = () => {
-            timelineEndRef.current?.scrollIntoView({ block: 'end' })
-        }
-
         const frameId = requestAnimationFrame(scrollToLatest)
-        const timeoutId = window.setTimeout(scrollToLatest, 250)
 
         return () => {
             cancelAnimationFrame(frameId)
-            window.clearTimeout(timeoutId)
         }
-    }, [diaries.length, isLoading, user])
+    }, [diaries.length, isLoading, scrollToLatest, user])
 
     const groupedDiaries = useMemo(() => {
         const groups: { dateKey: string; label: string; diaries: DiaryWithAuthor[] }[] = []
@@ -325,6 +323,7 @@ export default function TimelinePage() {
                                                             width={120}
                                                             height={80}
                                                             unoptimized
+                                                            onLoad={scrollToLatest}
                                                             className="h-20 w-28 rounded-xl object-cover ring-1 ring-black/5"
                                                         />
                                                     )}
