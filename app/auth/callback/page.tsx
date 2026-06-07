@@ -9,10 +9,34 @@ export default function AuthCallbackPage() {
 
     useEffect(() => {
         const handleCallback = async () => {
-            const { error } = await supabase.auth.getSession()
+            const { data, error } = await supabase.auth.getSession()
 
-            if (error) {
-                router.replace('/?authError=callback_failed')
+            if (error || !data.session) {
+                router.replace('/timeline?authError=callback_failed')
+                return
+            }
+
+            const providerToken = data.session.provider_token
+
+            if (!providerToken) {
+                await supabase.auth.signOut()
+                router.replace('/timeline?authError=discord_scope_missing')
+                return
+            }
+
+            const guildResponse = await fetch('/api/auth/discord-guild', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ providerToken }),
+            })
+
+            const guildResult = await guildResponse.json().catch(() => null) as { allowed?: boolean } | null
+
+            if (!guildResponse.ok || !guildResult?.allowed) {
+                await supabase.auth.signOut()
+                router.replace('/timeline?authError=discord_guild_required')
                 return
             }
 

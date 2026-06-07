@@ -10,6 +10,7 @@ import { Avatar } from '../components/Avatar'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
+import { DISCORD_LOGIN_SCOPES, authErrorMessages } from '../utils/auth'
 import { formatDateLabel, getDateKey } from '../utils/format'
 import { getFirstMarkdownImage } from '../utils/markdown'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
@@ -73,6 +74,7 @@ export default function TimelinePage() {
         const load = async () => {
             setIsLoading(true)
             let sessionUser: User | null = null
+            const authError = new URLSearchParams(window.location.search).get('authError')
 
             try {
                 const { data, error } = await withTimeout(
@@ -90,6 +92,9 @@ export default function TimelinePage() {
                     setUser(null)
                     setProfile(null)
                     setDiaries([])
+                    if (authError && authErrorMessages[authError]) {
+                        setMessage(authErrorMessages[authError])
+                    }
                     setIsLoading(false)
                     return
                 }
@@ -162,6 +167,7 @@ export default function TimelinePage() {
             provider: 'discord',
             options: {
                 redirectTo: `${location.origin}/auth/callback`,
+                scopes: DISCORD_LOGIN_SCOPES,
             },
         })
 
