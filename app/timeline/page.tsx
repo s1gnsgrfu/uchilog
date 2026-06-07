@@ -7,6 +7,7 @@ import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
 import { Avatar } from '../components/Avatar'
+import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
@@ -244,20 +245,7 @@ export default function TimelinePage() {
         <main className="min-h-screen bg-[#f6f1e8]">
             <AppHeader
                 actions={
-                    <>
-                        <AppLink
-                            href="/write"
-                            className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
-                        >
-                            書く
-                        </AppLink>
-                        <button
-                            onClick={() => setIsLogoutConfirmOpen(true)}
-                            className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
-                        >
-                            ログアウト
-                        </button>
-                    </>
+                    <DesktopHeaderActions onLogout={() => setIsLogoutConfirmOpen(true)} />
                 }
             />
 

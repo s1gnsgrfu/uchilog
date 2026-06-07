@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
 import { Avatar } from '../components/Avatar'
+import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { profileFromUserMetadata, syncProfile } from '../utils/profiles'
@@ -155,12 +156,7 @@ export default function MenuPage() {
         <main className="min-h-screen bg-[#f6f1e8]">
             <AppHeader
                 actions={
-                    <button
-                        onClick={() => setIsLogoutConfirmOpen(true)}
-                        className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
-                    >
-                        ログアウト
-                    </button>
+                    <DesktopHeaderActions onLogout={() => setIsLogoutConfirmOpen(true)} />
                 }
             />
 
