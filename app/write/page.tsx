@@ -52,11 +52,6 @@ export default function WritePage() {
             example: '> 今日はよくがんばった',
         },
         {
-            label: '画像',
-            description: '画像を挿入ボタンから、本文の好きな位置に入れられます。',
-            example: '![写真の説明](https://example.com/image.jpg)',
-        },
-        {
             label: 'コード',
             description: 'メモしたコマンドやコードを読みやすく表示します。',
             example: '```\nnpm run dev\n```',
@@ -124,7 +119,7 @@ export default function WritePage() {
             throw new Error('画像のアップロードに失敗しました')
         }
 
-        return await response.json() as { thumbUrl: string; displayUrl: string }
+        return await response.json() as { imageId: string; thumbUrl: string; displayUrl: string }
     }
 
     const captureBodySelection = () => {
@@ -173,7 +168,7 @@ export default function WritePage() {
 
         try {
             const uploadedImage = await uploadDiaryImage(file)
-            insertTextIntoBody(`![日記画像](${uploadedImage.displayUrl})`)
+            insertTextIntoBody(`[[画像:日記画像:${uploadedImage.imageId}]]`)
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : '画像のアップロードに失敗しました'
             setMessage(errorMessage)
@@ -392,7 +387,7 @@ export default function WritePage() {
                         {isShared ? 'みんなに共有' : '自分だけ'}
                     </p>
                     <h1 className="mb-5 text-2xl font-bold text-zinc-950">{title || 'タイトル'}</h1>
-                    <MarkdownRenderer body={body || '本文のプレビューがここに表示されます。'} />
+                    <MarkdownRenderer body={body || '本文のプレビューがここに表示されます。'} imageOwnerId={user?.id} />
                 </aside>
             </section>
 

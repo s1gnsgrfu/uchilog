@@ -13,7 +13,11 @@ const renderInline = (text: string) => {
     })
 }
 
-export function MarkdownRenderer({ body }: { body: string }) {
+const getDiaryImageUrl = (ownerId: string, imageId: string, variant: 'thumb' | 'display') => {
+    return `/api/images/diaries/${ownerId}/${imageId}/${variant}.webp`
+}
+
+export function MarkdownRenderer({ body, imageOwnerId }: { body: string; imageOwnerId?: string }) {
     const lines = body.split('\n')
     const elements: ReactNode[] = []
     let codeLines: string[] = []
@@ -61,6 +65,23 @@ export function MarkdownRenderer({ body }: { body: string }) {
 
         if (inCode) {
             codeLines.push(line)
+            return
+        }
+
+        const diaryImageMatch = line.match(/^\[\[画像:(.*?):([0-9a-f-]{36})]]$/)
+        if (diaryImageMatch && imageOwnerId) {
+            flushList()
+            elements.push(
+                <Image
+                    key={index}
+                    src={getDiaryImageUrl(imageOwnerId, diaryImageMatch[2], 'display')}
+                    alt={diaryImageMatch[1] || '日記画像'}
+                    width={960}
+                    height={540}
+                    unoptimized
+                    className="my-6 max-h-[520px] w-full rounded-xl object-cover"
+                />
+            )
             return
         }
 

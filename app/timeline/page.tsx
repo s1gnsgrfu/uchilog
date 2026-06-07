@@ -270,7 +270,7 @@ export default function TimelinePage() {
                                 {group.diaries.map((diary) => {
                                     const isOwn = diary.user_id === user.id
                                     const authorName = diary.author?.display_name ?? (isOwn ? profile?.display_name : null) ?? '名無し'
-                                    const thumbnail = getFirstMarkdownImage(diary.body)
+                                    const thumbnail = getFirstMarkdownImage(diary.body, diary.user_id)
                                     const thumbnailSrc = thumbnail ? getTimelineThumbnailUrl(thumbnail.src) : null
 
                                     return (

@@ -5,6 +5,7 @@ const MAX_THUMB_SIZE = 512 * 1024
 const MAX_DISPLAY_SIZE = 3 * 1024 * 1024
 
 type UploadResult = {
+    imageId: string
     thumbUrl: string
     displayUrl: string
 }
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
         ])
 
         const result: UploadResult = {
+            imageId,
             thumbUrl: `/api/images/${thumbKey}`,
             displayUrl: `/api/images/${displayKey}`,
         }
