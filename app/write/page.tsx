@@ -240,7 +240,7 @@ export default function WritePage() {
             />
 
             <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-36 pt-6 sm:pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-                <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                <div className="min-w-0 space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                     <div className="flex flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h1 className="text-xl font-bold text-zinc-950">日記を書く</h1>
