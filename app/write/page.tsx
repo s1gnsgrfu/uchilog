@@ -17,6 +17,7 @@ export default function WritePage() {
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [imageUrl, setImageUrl] = useState('')
+    const [isShared, setIsShared] = useState(true)
     const [message, setMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -125,6 +126,7 @@ export default function WritePage() {
             user_id: user.id,
             title: title.trim(),
             body: composedBody,
+            is_shared: isShared,
         })
 
         setIsSubmitting(false)
@@ -244,6 +246,21 @@ export default function WritePage() {
                         disabled={isCheckingAuth}
                         className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
                     />
+                    <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <input
+                            type="checkbox"
+                            checked={isShared}
+                            onChange={(event) => setIsShared(event.target.checked)}
+                            disabled={isCheckingAuth}
+                            className="mt-1 h-4 w-4 accent-zinc-950"
+                        />
+                        <span className="min-w-0">
+                            <span className="block text-sm font-bold text-zinc-900">みんなに共有する</span>
+                            <span className="mt-1 block text-sm leading-6 text-zinc-500">
+                                オンにすると、タイムラインで他のメンバーにも表示されます。
+                            </span>
+                        </span>
+                    </label>
                     {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
                     <textarea
                         value={body}
@@ -268,6 +285,9 @@ export default function WritePage() {
 
                 <aside className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                     <p className="mb-4 text-sm font-semibold text-zinc-500">プレビュー</p>
+                    <p className="mb-3 inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
+                        {isShared ? 'みんなに共有' : '自分だけ'}
+                    </p>
                     <h1 className="mb-5 text-2xl font-bold text-zinc-950">{title || 'タイトル'}</h1>
                     <MarkdownRenderer body={composedBody || '本文のプレビューがここに表示されます。'} />
                 </aside>
