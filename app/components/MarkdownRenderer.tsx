@@ -13,7 +13,15 @@ const renderInline = (text: string) => {
     })
 }
 
-export function MarkdownRenderer({ body }: { body: string }) {
+const getDiaryImageUrl = (ownerId: string, imageName: string, variant: 'thumb' | 'display') => {
+    return `/api/images/diaries/${ownerId}/${encodeURIComponent(imageName)}/${variant}.webp`
+}
+
+const getImageAlt = (imageName: string) => {
+    return imageName.replace(/\.webp$/i, '') || '日記画像'
+}
+
+export function MarkdownRenderer({ body, imageOwnerId }: { body: string; imageOwnerId?: string }) {
     const lines = body.split('\n')
     const elements: ReactNode[] = []
     let codeLines: string[] = []
@@ -64,7 +72,41 @@ export function MarkdownRenderer({ body }: { body: string }) {
             return
         }
 
-        const imageMatch = line.match(/^!\[(.*)]\((https?:\/\/[^)]+)\)$/)
+        const legacyDiaryImageMatch = line.match(/^\[\[画像:(.*?):([0-9a-f-]{36})]]$/)
+        if (legacyDiaryImageMatch && imageOwnerId) {
+            flushList()
+            elements.push(
+                <Image
+                    key={index}
+                    src={getDiaryImageUrl(imageOwnerId, legacyDiaryImageMatch[2], 'display')}
+                    alt={legacyDiaryImageMatch[1] || '日記画像'}
+                    width={960}
+                    height={540}
+                    unoptimized
+                    className="my-6 max-h-[520px] w-full rounded-xl object-cover"
+                />
+            )
+            return
+        }
+
+        const diaryImageMatch = line.match(/^\[\[画像:([^\]\n]+)]]$/)
+        if (diaryImageMatch && imageOwnerId) {
+            flushList()
+            elements.push(
+                <Image
+                    key={index}
+                    src={getDiaryImageUrl(imageOwnerId, diaryImageMatch[1], 'display')}
+                    alt={getImageAlt(diaryImageMatch[1])}
+                    width={960}
+                    height={540}
+                    unoptimized
+                    className="my-6 max-h-[520px] w-full rounded-xl object-cover"
+                />
+            )
+            return
+        }
+
+        const imageMatch = line.match(/^!\[(.*)]\(((?:https?:\/\/|\/)[^)]+)\)$/)
         if (imageMatch) {
             flushList()
             elements.push(

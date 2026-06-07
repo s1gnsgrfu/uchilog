@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
@@ -10,6 +10,7 @@ import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { MobileNav } from '../components/MobileNav'
+import { compressDiaryImage } from '../utils/imageCompression'
 import { syncProfile } from '../utils/profiles'
 
 export default function WritePage() {
@@ -17,14 +18,17 @@ export default function WritePage() {
     const [user, setUser] = useState<User | null>(null)
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
-    const [imageUrl, setImageUrl] = useState('')
     const [isShared, setIsShared] = useState(true)
     const [message, setMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isProcessingImage, setIsProcessingImage] = useState(false)
     const [isHelpOpen, setIsHelpOpen] = useState(false)
     const [isCheckingAuth, setIsCheckingAuth] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
+    const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
+    const pendingImageInsertRangeRef = useRef<{ start: number; end: number } | null>(null)
 
     const markdownTips = [
         {
@@ -46,11 +50,6 @@ export default function WritePage() {
             label: '引用',
             description: '誰かの言葉や印象に残った一文に使えます。',
             example: '> 今日はよくがんばった',
-        },
-        {
-            label: '画像',
-            description: '画像URLを本文の好きな位置に入れられます。',
-            example: '![写真の説明](https://example.com/image.jpg)',
         },
         {
             label: 'コード',
@@ -94,13 +93,89 @@ export default function WritePage() {
         }
     }, [])
 
-    const composedBody = useMemo(() => {
-        if (!imageUrl.trim()) {
-            return body
+    const uploadDiaryImage = async (file: File) => {
+        const { data } = await supabase.auth.getSession()
+        const accessToken = data.session?.access_token
+
+        if (!accessToken) {
+            throw new Error('ログインが必要です')
         }
 
-        return `${body.trim()}\n\n![日記画像](${imageUrl.trim()})`
-    }, [body, imageUrl])
+        const compressed = await compressDiaryImage(file)
+        const formData = new FormData()
+        formData.append('thumb', compressed.thumb)
+        formData.append('display', compressed.display)
+        formData.append('originalName', file.name)
+
+        const response = await fetch('/api/images/upload', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+            body: formData,
+        })
+
+        if (!response.ok) {
+            throw new Error('画像のアップロードに失敗しました')
+        }
+
+        return await response.json() as { imageName: string; thumbUrl: string; displayUrl: string }
+    }
+
+    const captureBodySelection = () => {
+        const textarea = bodyInputRef.current
+
+        if (!textarea || typeof textarea.selectionStart !== 'number' || typeof textarea.selectionEnd !== 'number') {
+            pendingImageInsertRangeRef.current = null
+            return
+        }
+
+        pendingImageInsertRangeRef.current = {
+            start: textarea.selectionStart,
+            end: textarea.selectionEnd,
+        }
+    }
+
+    const insertTextIntoBody = (text: string) => {
+        setBody((currentBody) => {
+            const range = pendingImageInsertRangeRef.current
+            const start = range ? Math.min(range.start, currentBody.length) : currentBody.length
+            const end = range ? Math.min(Math.max(range.end, start), currentBody.length) : currentBody.length
+            const before = currentBody.slice(0, start)
+            const after = currentBody.slice(end)
+            const needsLeadingBreak = Boolean(before.trim()) && !before.endsWith('\n\n')
+            const needsTrailingBreak = Boolean(after.trim()) && !after.startsWith('\n\n')
+            const insertion = `${needsLeadingBreak ? '\n\n' : ''}${text}${needsTrailingBreak ? '\n\n' : ''}`
+            const nextBody = `${before}${insertion}${after}`
+            const nextCaretPosition = before.length + insertion.length
+
+            requestAnimationFrame(() => {
+                bodyInputRef.current?.focus()
+                bodyInputRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition)
+            })
+
+            return nextBody
+        })
+
+        pendingImageInsertRangeRef.current = null
+        setFieldErrors((currentErrors) => ({ ...currentErrors, body: '' }))
+        setMessage('')
+    }
+
+    const insertImageFromFile = async (file: File) => {
+        setIsProcessingImage(true)
+        setMessage('')
+
+        try {
+            const uploadedImage = await uploadDiaryImage(file)
+            insertTextIntoBody(`[[画像:${uploadedImage.imageName}]]`)
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '画像のアップロードに失敗しました'
+            setMessage(errorMessage)
+        } finally {
+            setIsProcessingImage(false)
+        }
+    }
 
     const createDiary = async () => {
         if (!user) {
@@ -123,21 +198,26 @@ export default function WritePage() {
         setMessage('')
         setIsSubmitting(true)
 
-        const { error } = await supabase.from('diaries').insert({
-            user_id: user.id,
-            title: title.trim(),
-            body: composedBody,
-            is_shared: isShared,
-        })
+        try {
+            const { error } = await supabase.from('diaries').insert({
+                user_id: user.id,
+                title: title.trim(),
+                body: body.trim(),
+                is_shared: isShared,
+            })
 
-        setIsSubmitting(false)
+            if (error) {
+                setMessage(`投稿に失敗しました: ${error.message}`)
+                return
+            }
 
-        if (error) {
-            setMessage(`投稿に失敗しました: ${error.message}`)
-            return
+            router.push('/timeline')
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '投稿に失敗しました'
+            setMessage(errorMessage)
+        } finally {
+            setIsSubmitting(false)
         }
-
-        router.push('/timeline')
     }
 
     const insertMarkdown = (example: string) => {
@@ -188,7 +268,7 @@ export default function WritePage() {
             />
 
             <section className="mx-auto grid max-w-5xl gap-5 px-4 pb-36 pt-6 sm:pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-                <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                <div className="min-w-0 space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                     <div className="flex flex-col gap-3 border-b border-zinc-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h1 className="text-xl font-bold text-zinc-950">日記を書く</h1>
@@ -204,10 +284,10 @@ export default function WritePage() {
                             </button>
                             <button
                                 onClick={createDiary}
-                                disabled={isSubmitting || isCheckingAuth}
+                                disabled={isSubmitting || isProcessingImage || isCheckingAuth}
                                 className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
                             >
-                                {isSubmitting ? '投稿中' : '投稿する'}
+                                {isProcessingImage ? '画像処理中' : isSubmitting ? '投稿中' : '投稿する'}
                             </button>
                         </div>
                     </div>
@@ -235,13 +315,6 @@ export default function WritePage() {
                         }`}
                     />
                     {fieldErrors.title && <p className="-mt-2 text-sm font-semibold text-red-600">{fieldErrors.title}</p>}
-                    <input
-                        value={imageUrl}
-                        onChange={(event) => setImageUrl(event.target.value)}
-                        placeholder="画像URL"
-                        disabled={isCheckingAuth}
-                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
-                    />
                     <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
                         <input
                             type="checkbox"
@@ -258,7 +331,36 @@ export default function WritePage() {
                         </span>
                     </label>
                     {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
+                    <div className="flex justify-end">
+                        <input
+                            ref={imageInputRef}
+                            type="file"
+                            accept="image/*"
+                            disabled={isCheckingAuth || isSubmitting || isProcessingImage}
+                            onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null
+                                event.target.value = ''
+
+                                if (file) {
+                                    void insertImageFromFile(file)
+                                }
+                            }}
+                            className="sr-only"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                captureBodySelection()
+                                imageInputRef.current?.click()
+                            }}
+                            disabled={isCheckingAuth || isSubmitting || isProcessingImage}
+                            className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950 disabled:border-zinc-200 disabled:text-zinc-400"
+                        >
+                            {isProcessingImage ? '画像処理中' : '画像を挿入'}
+                        </button>
+                    </div>
                     <textarea
+                        ref={bodyInputRef}
                         value={body}
                         onChange={(event) => {
                             setBody(event.target.value)
@@ -285,7 +387,7 @@ export default function WritePage() {
                         {isShared ? 'みんなに共有' : '自分だけ'}
                     </p>
                     <h1 className="mb-5 text-2xl font-bold text-zinc-950">{title || 'タイトル'}</h1>
-                    <MarkdownRenderer body={composedBody || '本文のプレビューがここに表示されます。'} />
+                    <MarkdownRenderer body={body || '本文のプレビューがここに表示されます。'} imageOwnerId={user?.id} />
                 </aside>
             </section>
 
