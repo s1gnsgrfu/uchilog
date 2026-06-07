@@ -19,6 +19,15 @@ export const formatDateTime = (value: string) => {
     }).format(date)
 }
 
+export const formatJoinedDate = (value: string) => {
+    const date = new Date(value)
+    return new Intl.DateTimeFormat('ja-JP', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    }).format(date)
+}
+
 export const getDateKey = (value: string) => {
     const date = new Date(value)
     return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`

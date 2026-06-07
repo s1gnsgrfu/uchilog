@@ -10,7 +10,8 @@ import { Avatar } from '../components/Avatar'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
-import { formatDateLabel, getDateKey } from '../utils/format'
+import { DISCORD_LOGIN_SCOPES, authErrorMessages } from '../utils/auth'
+import { formatDateLabel, formatJoinedDate, getDateKey } from '../utils/format'
 import { getFirstMarkdownImage } from '../utils/markdown'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
 
@@ -37,6 +38,7 @@ export default function TimelinePage() {
     const [message, setMessage] = useState('')
     const [isLoading, setIsLoading] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
+    const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
 
     const fetchTimeline = useCallback(async (currentUser: User, currentProfile: Profile | null) => {
         const { data, error } = await supabase
@@ -73,6 +75,7 @@ export default function TimelinePage() {
         const load = async () => {
             setIsLoading(true)
             let sessionUser: User | null = null
+            const authError = new URLSearchParams(window.location.search).get('authError')
 
             try {
                 const { data, error } = await withTimeout(
@@ -90,6 +93,9 @@ export default function TimelinePage() {
                     setUser(null)
                     setProfile(null)
                     setDiaries([])
+                    if (authError && authErrorMessages[authError]) {
+                        setMessage(authErrorMessages[authError])
+                    }
                     setIsLoading(false)
                     return
                 }
@@ -162,6 +168,7 @@ export default function TimelinePage() {
             provider: 'discord',
             options: {
                 redirectTo: `${location.origin}/auth/callback`,
+                scopes: DISCORD_LOGIN_SCOPES,
             },
         })
 
@@ -262,10 +269,27 @@ export default function TimelinePage() {
                                             key={diary.id}
                                             className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
                                         >
-                                            {!isOwn && <Avatar profile={diary.author} fallback={authorName} />}
+                                            {!isOwn && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedProfile(diary.author)}
+                                                    disabled={!diary.author}
+                                                    aria-label={`${authorName}のプロフィールを見る`}
+                                                    className="shrink-0 rounded-full transition hover:scale-105 disabled:cursor-default disabled:hover:scale-100"
+                                                >
+                                                    <Avatar profile={diary.author} fallback={authorName} />
+                                                </button>
+                                            )}
 
                                             <div className={`max-w-[76%] ${isOwn ? 'text-right' : 'text-left'}`}>
-                                                <p className="mb-1 px-1 text-xs font-semibold text-zinc-500">{authorName}</p>
+                                                <p className={`mb-1 flex items-center gap-2 px-1 text-xs font-semibold text-zinc-500 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                                    <span>{authorName}</span>
+                                                    {isOwn && !diary.is_shared && (
+                                                        <span className="rounded-full bg-zinc-200/80 px-2 py-0.5 text-[11px] text-zinc-600">
+                                                            自分だけ
+                                                        </span>
+                                                    )}
+                                                </p>
                                                 <AppLink
                                                     href={`/diary/${diary.id}`}
                                                     className={`block space-y-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold leading-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
@@ -314,6 +338,48 @@ export default function TimelinePage() {
                     onCancel={() => setIsLogoutConfirmOpen(false)}
                     onConfirm={logout}
                 />
+            )}
+
+            {selectedProfile && (
+                <div
+                    onClick={() => setSelectedProfile(null)}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-6"
+                >
+                    <section
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="profile-dialog-title"
+                        onClick={(event) => event.stopPropagation()}
+                        className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-black/5"
+                    >
+                        <button
+                            onClick={() => setSelectedProfile(null)}
+                            aria-label="プロフィールを閉じる"
+                            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-xl font-semibold leading-none text-zinc-600 shadow-sm hover:border-zinc-400 hover:text-zinc-950"
+                        >
+                            ×
+                        </button>
+
+                        <div className="flex items-center gap-4 pr-10">
+                            <Avatar profile={selectedProfile} fallback={selectedProfile.display_name ?? '名無し'} size="lg" />
+                            <div className="min-w-0">
+                                <h2 id="profile-dialog-title" className="truncate text-xl font-bold text-zinc-950">
+                                    {selectedProfile.display_name ?? '名無し'}
+                                </h2>
+                                <p className="mt-1 text-sm text-zinc-500">
+                                    {formatJoinedDate(selectedProfile.created_at)} から利用
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 rounded-xl bg-zinc-50 p-4">
+                            <p className="text-xs font-bold text-zinc-500">自己紹介</p>
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-zinc-700">
+                                {selectedProfile.bio || '自己紹介はまだありません。'}
+                            </p>
+                        </div>
+                    </section>
+                </div>
             )}
         </main>
     )
