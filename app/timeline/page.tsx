@@ -16,6 +16,8 @@ import { formatDateLabel, formatJoinedDate, getDateKey } from '../utils/format'
 import { getFirstMarkdownImage, getTimelineThumbnailUrl } from '../utils/markdown'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
 
+const TIMELINE_REFRESH_INTERVAL_MS = 30 * 1000
+
 const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs = 10000) => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
@@ -34,10 +36,17 @@ const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs =
 
 export default function TimelinePage() {
     const timelineEndRef = useRef<HTMLDivElement | null>(null)
+    const userRef = useRef<User | null>(null)
+    const lastUpdatedAtRef = useRef<Date | null>(null)
+    const isRefreshingRef = useRef(false)
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [diaries, setDiaries] = useState<DiaryWithAuthor[]>([])
     const [message, setMessage] = useState('')
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [refreshError, setRefreshError] = useState('')
+    const [refreshNotice, setRefreshNotice] = useState('')
     const [isLoading, setIsLoading] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
     const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
@@ -56,8 +65,7 @@ export default function TimelinePage() {
             .order('created_at', { ascending: true })
 
         if (error) {
-            setMessage(`タイムラインの取得に失敗しました: ${error.message}`)
-            return
+            throw new Error(`タイムラインの取得に失敗しました: ${error.message}`)
         }
 
         const diaryRows = (data ?? []) as Diary[]
@@ -76,7 +84,90 @@ export default function TimelinePage() {
                 author: profileMap.get(diary.user_id) ?? null,
             }))
         )
+        setLastUpdatedAt(new Date())
     }, [])
+
+    useEffect(() => {
+        userRef.current = user
+    }, [user])
+
+    useEffect(() => {
+        lastUpdatedAtRef.current = lastUpdatedAt
+    }, [lastUpdatedAt])
+
+    useEffect(() => {
+        if (!refreshNotice) {
+            return
+        }
+
+        const timeoutId = setTimeout(() => setRefreshNotice(''), 2500)
+
+        return () => {
+            clearTimeout(timeoutId)
+        }
+    }, [refreshNotice])
+
+    const refreshTimeline = useCallback(async (showSuccessNotice = false) => {
+        const currentUser = userRef.current
+
+        if (!currentUser || isRefreshingRef.current) {
+            return
+        }
+
+        isRefreshingRef.current = true
+        setIsRefreshing(true)
+        setRefreshError('')
+        setRefreshNotice('')
+
+        try {
+            const syncedProfile = await withTimeout(
+                syncProfile(currentUser),
+                'プロフィールの更新に時間がかかっています'
+            )
+
+            setProfile(syncedProfile)
+            await withTimeout(
+                fetchTimeline(currentUser, syncedProfile),
+                'タイムラインの更新に時間がかかっています'
+            )
+
+            if (showSuccessNotice) {
+                setRefreshNotice('最新の状態です')
+            }
+        } catch {
+            setRefreshError('更新できませんでした。通信状態を確認してください。')
+        } finally {
+            isRefreshingRef.current = false
+            setIsRefreshing(false)
+        }
+    }, [fetchTimeline])
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible' || !userRef.current) {
+                return
+            }
+
+            const currentLastUpdatedAt = lastUpdatedAtRef.current
+
+            if (!currentLastUpdatedAt) {
+                void refreshTimeline()
+                return
+            }
+
+            const elapsedMs = Date.now() - currentLastUpdatedAt.getTime()
+
+            if (elapsedMs >= TIMELINE_REFRESH_INTERVAL_MS) {
+                void refreshTimeline()
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+        }
+    }, [refreshTimeline])
 
     useEffect(() => {
         let isMounted = true
@@ -102,6 +193,9 @@ export default function TimelinePage() {
                     setUser(null)
                     setProfile(null)
                     setDiaries([])
+                    setLastUpdatedAt(null)
+                    setRefreshError('')
+                    setRefreshNotice('')
                     if (authError && authErrorMessages[authError]) {
                         setMessage(authErrorMessages[authError])
                     }
@@ -121,6 +215,8 @@ export default function TimelinePage() {
                 }
 
                 setProfile(syncedProfile)
+                setRefreshError('')
+                setRefreshNotice('')
 
                 await withTimeout(
                     fetchTimeline(sessionUser, syncedProfile),
@@ -136,6 +232,7 @@ export default function TimelinePage() {
                 setUser(sessionUser)
                 setProfile(null)
                 setDiaries([])
+                setLastUpdatedAt(null)
             } finally {
                 if (isMounted) {
                     setIsLoading(false)
@@ -209,8 +306,22 @@ export default function TimelinePage() {
         setUser(null)
         setProfile(null)
         setDiaries([])
+        setLastUpdatedAt(null)
+        setRefreshError('')
+        setRefreshNotice('')
         setIsLogoutConfirmOpen(false)
     }
+
+    const lastUpdatedLabel = useMemo(() => {
+        if (!lastUpdatedAt) {
+            return '未更新'
+        }
+
+        return `最終更新 ${lastUpdatedAt.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+        })}`
+    }, [lastUpdatedAt])
 
     if (!user) {
         return (
@@ -249,8 +360,25 @@ export default function TimelinePage() {
                 }
             />
 
-            <section className="mx-auto max-w-3xl px-3 pb-36 pt-6 sm:pb-6">
+            <section className="mx-auto max-w-3xl px-3 pb-36 pt-4 sm:pb-6">
                 {message && <p className="mb-4 rounded-xl bg-white px-4 py-3 text-sm text-red-600 shadow-sm">{message}</p>}
+
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/90 px-3 py-2 text-sm shadow-sm ring-1 ring-black/5">
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-700">{lastUpdatedLabel}</p>
+                        {isRefreshing && <p className="text-xs font-semibold text-zinc-500">更新中...</p>}
+                        {refreshNotice && <p className="text-xs font-semibold text-emerald-700">{refreshNotice}</p>}
+                        {refreshError && <p className="text-xs font-semibold text-red-600">{refreshError}</p>}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void refreshTimeline(true)}
+                        disabled={isRefreshing}
+                        className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-950 disabled:text-zinc-300"
+                    >
+                        {isRefreshing ? '更新中' : '更新'}
+                    </button>
+                </div>
 
                 {groupedDiaries.length === 0 ? (
                     <div className="mt-16 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
