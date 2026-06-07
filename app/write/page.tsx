@@ -199,16 +199,24 @@ export default function WritePage() {
         setIsSubmitting(true)
 
         try {
-            const { error } = await supabase.from('diaries').insert({
-                user_id: user.id,
-                title: title.trim(),
-                body: body.trim(),
-                is_shared: isShared,
-            })
+            const { data, error } = await supabase
+                .from('diaries')
+                .insert({
+                    user_id: user.id,
+                    title: title.trim(),
+                    body: body.trim(),
+                    is_shared: isShared,
+                })
+                .select('id,is_shared')
+                .single()
 
             if (error) {
                 setMessage(`投稿に失敗しました: ${error.message}`)
                 return
+            }
+
+            if (data?.is_shared) {
+                void notifyDiaryCreated(data.id)
             }
 
             router.push('/timeline')
@@ -218,6 +226,24 @@ export default function WritePage() {
         } finally {
             setIsSubmitting(false)
         }
+    }
+
+    const notifyDiaryCreated = async (diaryId: string) => {
+        const { data } = await supabase.auth.getSession()
+        const accessToken = data.session?.access_token
+
+        if (!accessToken) {
+            return
+        }
+
+        await fetch('/api/push/notify', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ diaryId }),
+        })
     }
 
     const insertMarkdown = (example: string) => {
