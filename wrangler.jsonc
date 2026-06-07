@@ -20,6 +20,12 @@
 	"images": {
 		"binding": "IMAGES"
 	},
+	"r2_buckets": [
+		{
+			"binding": "DIARY_IMAGES",
+			"bucket_name": "uchilog-diary-images"
+		}
+	],
 	"env": {
 		"dev": {
 			"name": "uchilog-dev",
@@ -30,8 +36,14 @@
 				}
 			],
 			"images": {
-        		"binding": "IMAGES"
-      		}
+				"binding": "IMAGES"
+			},
+			"r2_buckets": [
+				{
+					"binding": "DIARY_IMAGES",
+					"bucket_name": "uchilog-dev-diary-images"
+				}
+			]
 		}
 	}
 }
