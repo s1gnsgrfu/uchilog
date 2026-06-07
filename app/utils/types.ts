@@ -12,6 +12,7 @@ export type Diary = {
     user_id: string
     title: string
     body: string
+    is_shared: boolean
     created_at: string
     updated_at: string
 }
