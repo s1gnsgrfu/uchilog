@@ -271,7 +271,14 @@ export default function TimelinePage() {
                                             {!isOwn && <Avatar profile={diary.author} fallback={authorName} />}
 
                                             <div className={`max-w-[76%] ${isOwn ? 'text-right' : 'text-left'}`}>
-                                                <p className="mb-1 px-1 text-xs font-semibold text-zinc-500">{authorName}</p>
+                                                <p className={`mb-1 flex items-center gap-2 px-1 text-xs font-semibold text-zinc-500 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                                    <span>{authorName}</span>
+                                                    {isOwn && !diary.is_shared && (
+                                                        <span className="rounded-full bg-zinc-200/80 px-2 py-0.5 text-[11px] text-zinc-600">
+                                                            自分だけ
+                                                        </span>
+                                                    )}
+                                                </p>
                                                 <AppLink
                                                     href={`/diary/${diary.id}`}
                                                     className={`block space-y-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold leading-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
