@@ -290,10 +290,7 @@ export default function WritePage() {
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <p className="text-sm font-bold text-zinc-900">画像</p>
-                                <p className="mt-1 text-sm leading-6 text-zinc-500">
-                                    投稿時にWebPへ圧縮して保存します。
-                                </p>
+                                <p className="text-sm font-bold text-zinc-900">サムネイル</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                                 <label className="cursor-pointer rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950">
@@ -338,9 +335,6 @@ export default function WritePage() {
                                 )}
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-semibold text-zinc-900">{selectedImage.name}</p>
-                                    <p className="mt-1 text-xs text-zinc-500">
-                                        サムネイル 400px / 本文 1600px に変換します
-                                    </p>
                                 </div>
                             </div>
                         )}
