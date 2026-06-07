@@ -10,6 +10,7 @@ import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { MobileNav } from '../components/MobileNav'
+import { compressDiaryImage } from '../utils/imageCompression'
 import { syncProfile } from '../utils/profiles'
 
 export default function WritePage() {
@@ -17,11 +18,13 @@ export default function WritePage() {
     const [user, setUser] = useState<User | null>(null)
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
-    const [imageUrl, setImageUrl] = useState('')
+    const [selectedImage, setSelectedImage] = useState<File | null>(null)
+    const [imagePreviewUrl, setImagePreviewUrl] = useState('')
     const [isShared, setIsShared] = useState(true)
     const [message, setMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isProcessingImage, setIsProcessingImage] = useState(false)
     const [isHelpOpen, setIsHelpOpen] = useState(false)
     const [isCheckingAuth, setIsCheckingAuth] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
@@ -94,13 +97,51 @@ export default function WritePage() {
         }
     }, [])
 
-    const composedBody = useMemo(() => {
-        if (!imageUrl.trim()) {
-            return body
+    useEffect(() => {
+        if (!imagePreviewUrl) {
+            return
         }
 
-        return `${body.trim()}\n\n![日記画像](${imageUrl.trim()})`
-    }, [body, imageUrl])
+        return () => {
+            URL.revokeObjectURL(imagePreviewUrl)
+        }
+    }, [imagePreviewUrl])
+
+    const previewBody = useMemo(() => body, [body])
+
+    const uploadSelectedImage = async () => {
+        if (!selectedImage) {
+            return null
+        }
+
+        const { data } = await supabase.auth.getSession()
+        const accessToken = data.session?.access_token
+
+        if (!accessToken) {
+            throw new Error('ログインが必要です')
+        }
+
+        setIsProcessingImage(true)
+        const compressed = await compressDiaryImage(selectedImage)
+        const formData = new FormData()
+        formData.append('thumb', compressed.thumb)
+        formData.append('display', compressed.display)
+        formData.append('originalName', selectedImage.name)
+
+        const response = await fetch('/api/images/upload', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+            body: formData,
+        })
+
+        if (!response.ok) {
+            throw new Error('画像のアップロードに失敗しました')
+        }
+
+        return await response.json() as { thumbUrl: string; displayUrl: string }
+    }
 
     const createDiary = async () => {
         if (!user) {
@@ -123,21 +164,32 @@ export default function WritePage() {
         setMessage('')
         setIsSubmitting(true)
 
-        const { error } = await supabase.from('diaries').insert({
-            user_id: user.id,
-            title: title.trim(),
-            body: composedBody,
-            is_shared: isShared,
-        })
+        try {
+            const uploadedImage = await uploadSelectedImage()
+            const finalBody = uploadedImage
+                ? `${body.trim()}\n\n![日記画像](${uploadedImage.displayUrl})`
+                : body.trim()
 
-        setIsSubmitting(false)
+            const { error } = await supabase.from('diaries').insert({
+                user_id: user.id,
+                title: title.trim(),
+                body: finalBody,
+                is_shared: isShared,
+            })
 
-        if (error) {
-            setMessage(`投稿に失敗しました: ${error.message}`)
-            return
+            if (error) {
+                setMessage(`投稿に失敗しました: ${error.message}`)
+                return
+            }
+
+            router.push('/timeline')
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '投稿に失敗しました'
+            setMessage(errorMessage)
+        } finally {
+            setIsSubmitting(false)
+            setIsProcessingImage(false)
         }
-
-        router.push('/timeline')
     }
 
     const insertMarkdown = (example: string) => {
@@ -204,10 +256,10 @@ export default function WritePage() {
                             </button>
                             <button
                                 onClick={createDiary}
-                                disabled={isSubmitting || isCheckingAuth}
+                                disabled={isSubmitting || isProcessingImage || isCheckingAuth}
                                 className="rounded-full bg-zinc-950 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-400"
                             >
-                                {isSubmitting ? '投稿中' : '投稿する'}
+                                {isProcessingImage ? '画像処理中' : isSubmitting ? '投稿中' : '投稿する'}
                             </button>
                         </div>
                     </div>
@@ -235,13 +287,64 @@ export default function WritePage() {
                         }`}
                     />
                     {fieldErrors.title && <p className="-mt-2 text-sm font-semibold text-red-600">{fieldErrors.title}</p>}
-                    <input
-                        value={imageUrl}
-                        onChange={(event) => setImageUrl(event.target.value)}
-                        placeholder="画像URL"
-                        disabled={isCheckingAuth}
-                        className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400"
-                    />
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm font-bold text-zinc-900">画像</p>
+                                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                                    投稿時にWebPへ圧縮して保存します。
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <label className="cursor-pointer rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950">
+                                    画像を選択
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        disabled={isCheckingAuth || isSubmitting}
+                                        onChange={(event) => {
+                                            const file = event.target.files?.[0] ?? null
+                                            setSelectedImage(file)
+                                            setImagePreviewUrl(file ? URL.createObjectURL(file) : '')
+                                            event.target.value = ''
+                                        }}
+                                        className="sr-only"
+                                    />
+                                </label>
+                                {selectedImage && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedImage(null)
+                                            setImagePreviewUrl('')
+                                        }}
+                                        disabled={isCheckingAuth || isSubmitting}
+                                        className="rounded-full px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-950"
+                                    >
+                                        削除
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        {selectedImage && (
+                            <div className="mt-4 flex items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-black/5">
+                                {imagePreviewUrl && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={imagePreviewUrl}
+                                        alt=""
+                                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                                    />
+                                )}
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-zinc-900">{selectedImage.name}</p>
+                                    <p className="mt-1 text-xs text-zinc-500">
+                                        サムネイル 400px / 本文 1600px に変換します
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
                         <input
                             type="checkbox"
@@ -285,7 +388,15 @@ export default function WritePage() {
                         {isShared ? 'みんなに共有' : '自分だけ'}
                     </p>
                     <h1 className="mb-5 text-2xl font-bold text-zinc-950">{title || 'タイトル'}</h1>
-                    <MarkdownRenderer body={composedBody || '本文のプレビューがここに表示されます。'} />
+                    {imagePreviewUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={imagePreviewUrl}
+                            alt=""
+                            className="mb-5 max-h-64 w-full rounded-xl object-cover"
+                        />
+                    )}
+                    <MarkdownRenderer body={previewBody || '本文のプレビューがここに表示されます。'} />
                 </aside>
             </section>
 

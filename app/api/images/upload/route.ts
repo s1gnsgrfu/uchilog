@@ -44,7 +44,7 @@ async function getAuthenticatedUserId(request: Request) {
     return data.user.id
 }
 
-function isValidWebpFile(value: FormDataEntryValue | null, maxSize: number) {
+function isValidWebpFile(value: FormDataEntryValue | null, maxSize: number): value is File {
     return value instanceof File
         && value.type === 'image/webp'
         && value.size > 0

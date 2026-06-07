@@ -64,7 +64,7 @@ export function MarkdownRenderer({ body }: { body: string }) {
             return
         }
 
-        const imageMatch = line.match(/^!\[(.*)]\((https?:\/\/[^)]+)\)$/)
+        const imageMatch = line.match(/^!\[(.*)]\(((?:https?:\/\/|\/)[^)]+)\)$/)
         if (imageMatch) {
             flushList()
             elements.push(

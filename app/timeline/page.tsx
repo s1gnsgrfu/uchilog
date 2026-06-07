@@ -13,7 +13,7 @@ import { MobileNav } from '../components/MobileNav'
 import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
 import { DISCORD_LOGIN_SCOPES, authErrorMessages } from '../utils/auth'
 import { formatDateLabel, formatJoinedDate, getDateKey } from '../utils/format'
-import { getFirstMarkdownImage } from '../utils/markdown'
+import { getFirstMarkdownImage, getTimelineThumbnailUrl } from '../utils/markdown'
 import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
 
 const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs = 10000) => {
@@ -271,6 +271,7 @@ export default function TimelinePage() {
                                     const isOwn = diary.user_id === user.id
                                     const authorName = diary.author?.display_name ?? (isOwn ? profile?.display_name : null) ?? '名無し'
                                     const thumbnail = getFirstMarkdownImage(diary.body)
+                                    const thumbnailSrc = thumbnail ? getTimelineThumbnailUrl(thumbnail.src) : null
 
                                     return (
                                         <div
@@ -309,7 +310,7 @@ export default function TimelinePage() {
                                                     <span>{diary.title}</span>
                                                     {thumbnail && (
                                                         <Image
-                                                            src={thumbnail.src}
+                                                            src={thumbnailSrc ?? thumbnail.src}
                                                             alt={thumbnail.alt}
                                                             width={120}
                                                             height={80}
