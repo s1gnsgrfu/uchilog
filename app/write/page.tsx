@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
@@ -18,8 +18,6 @@ export default function WritePage() {
     const [user, setUser] = useState<User | null>(null)
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
-    const [selectedImage, setSelectedImage] = useState<File | null>(null)
-    const [imagePreviewUrl, setImagePreviewUrl] = useState('')
     const [isShared, setIsShared] = useState(true)
     const [message, setMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
@@ -28,6 +26,9 @@ export default function WritePage() {
     const [isHelpOpen, setIsHelpOpen] = useState(false)
     const [isCheckingAuth, setIsCheckingAuth] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
+    const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
+    const pendingImageInsertRangeRef = useRef<{ start: number; end: number } | null>(null)
 
     const markdownTips = [
         {
@@ -52,7 +53,7 @@ export default function WritePage() {
         },
         {
             label: '画像',
-            description: '画像URLを本文の好きな位置に入れられます。',
+            description: '画像を挿入ボタンから、本文の好きな位置に入れられます。',
             example: '![写真の説明](https://example.com/image.jpg)',
         },
         {
@@ -97,23 +98,7 @@ export default function WritePage() {
         }
     }, [])
 
-    useEffect(() => {
-        if (!imagePreviewUrl) {
-            return
-        }
-
-        return () => {
-            URL.revokeObjectURL(imagePreviewUrl)
-        }
-    }, [imagePreviewUrl])
-
-    const previewBody = useMemo(() => body, [body])
-
-    const uploadSelectedImage = async () => {
-        if (!selectedImage) {
-            return null
-        }
-
+    const uploadDiaryImage = async (file: File) => {
         const { data } = await supabase.auth.getSession()
         const accessToken = data.session?.access_token
 
@@ -121,12 +106,11 @@ export default function WritePage() {
             throw new Error('ログインが必要です')
         }
 
-        setIsProcessingImage(true)
-        const compressed = await compressDiaryImage(selectedImage)
+        const compressed = await compressDiaryImage(file)
         const formData = new FormData()
         formData.append('thumb', compressed.thumb)
         formData.append('display', compressed.display)
-        formData.append('originalName', selectedImage.name)
+        formData.append('originalName', file.name)
 
         const response = await fetch('/api/images/upload', {
             method: 'POST',
@@ -141,6 +125,61 @@ export default function WritePage() {
         }
 
         return await response.json() as { thumbUrl: string; displayUrl: string }
+    }
+
+    const captureBodySelection = () => {
+        const textarea = bodyInputRef.current
+
+        if (!textarea || typeof textarea.selectionStart !== 'number' || typeof textarea.selectionEnd !== 'number') {
+            pendingImageInsertRangeRef.current = null
+            return
+        }
+
+        pendingImageInsertRangeRef.current = {
+            start: textarea.selectionStart,
+            end: textarea.selectionEnd,
+        }
+    }
+
+    const insertTextIntoBody = (text: string) => {
+        setBody((currentBody) => {
+            const range = pendingImageInsertRangeRef.current
+            const start = range ? Math.min(range.start, currentBody.length) : currentBody.length
+            const end = range ? Math.min(Math.max(range.end, start), currentBody.length) : currentBody.length
+            const before = currentBody.slice(0, start)
+            const after = currentBody.slice(end)
+            const needsLeadingBreak = Boolean(before.trim()) && !before.endsWith('\n\n')
+            const needsTrailingBreak = Boolean(after.trim()) && !after.startsWith('\n\n')
+            const insertion = `${needsLeadingBreak ? '\n\n' : ''}${text}${needsTrailingBreak ? '\n\n' : ''}`
+            const nextBody = `${before}${insertion}${after}`
+            const nextCaretPosition = before.length + insertion.length
+
+            requestAnimationFrame(() => {
+                bodyInputRef.current?.focus()
+                bodyInputRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition)
+            })
+
+            return nextBody
+        })
+
+        pendingImageInsertRangeRef.current = null
+        setFieldErrors((currentErrors) => ({ ...currentErrors, body: '' }))
+        setMessage('')
+    }
+
+    const insertImageFromFile = async (file: File) => {
+        setIsProcessingImage(true)
+        setMessage('')
+
+        try {
+            const uploadedImage = await uploadDiaryImage(file)
+            insertTextIntoBody(`![日記画像](${uploadedImage.displayUrl})`)
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '画像のアップロードに失敗しました'
+            setMessage(errorMessage)
+        } finally {
+            setIsProcessingImage(false)
+        }
     }
 
     const createDiary = async () => {
@@ -165,15 +204,10 @@ export default function WritePage() {
         setIsSubmitting(true)
 
         try {
-            const uploadedImage = await uploadSelectedImage()
-            const finalBody = uploadedImage
-                ? `${body.trim()}\n\n![日記画像](${uploadedImage.displayUrl})`
-                : body.trim()
-
             const { error } = await supabase.from('diaries').insert({
                 user_id: user.id,
                 title: title.trim(),
-                body: finalBody,
+                body: body.trim(),
                 is_shared: isShared,
             })
 
@@ -188,7 +222,6 @@ export default function WritePage() {
             setMessage(errorMessage)
         } finally {
             setIsSubmitting(false)
-            setIsProcessingImage(false)
         }
     }
 
@@ -287,58 +320,6 @@ export default function WritePage() {
                         }`}
                     />
                     {fieldErrors.title && <p className="-mt-2 text-sm font-semibold text-red-600">{fieldErrors.title}</p>}
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-sm font-bold text-zinc-900">サムネイル</p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <label className="cursor-pointer rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950">
-                                    画像を選択
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        disabled={isCheckingAuth || isSubmitting}
-                                        onChange={(event) => {
-                                            const file = event.target.files?.[0] ?? null
-                                            setSelectedImage(file)
-                                            setImagePreviewUrl(file ? URL.createObjectURL(file) : '')
-                                            event.target.value = ''
-                                        }}
-                                        className="sr-only"
-                                    />
-                                </label>
-                                {selectedImage && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedImage(null)
-                                            setImagePreviewUrl('')
-                                        }}
-                                        disabled={isCheckingAuth || isSubmitting}
-                                        className="rounded-full px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-950"
-                                    >
-                                        削除
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        {selectedImage && (
-                            <div className="mt-4 flex items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-black/5">
-                                {imagePreviewUrl && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                        src={imagePreviewUrl}
-                                        alt=""
-                                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                                    />
-                                )}
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold text-zinc-900">{selectedImage.name}</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
                     <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
                         <input
                             type="checkbox"
@@ -355,7 +336,36 @@ export default function WritePage() {
                         </span>
                     </label>
                     {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
+                    <div className="flex justify-end">
+                        <input
+                            ref={imageInputRef}
+                            type="file"
+                            accept="image/*"
+                            disabled={isCheckingAuth || isSubmitting || isProcessingImage}
+                            onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null
+                                event.target.value = ''
+
+                                if (file) {
+                                    void insertImageFromFile(file)
+                                }
+                            }}
+                            className="sr-only"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                captureBodySelection()
+                                imageInputRef.current?.click()
+                            }}
+                            disabled={isCheckingAuth || isSubmitting || isProcessingImage}
+                            className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-500 hover:text-zinc-950 disabled:border-zinc-200 disabled:text-zinc-400"
+                        >
+                            {isProcessingImage ? '画像処理中' : '画像を挿入'}
+                        </button>
+                    </div>
                     <textarea
+                        ref={bodyInputRef}
                         value={body}
                         onChange={(event) => {
                             setBody(event.target.value)
@@ -382,15 +392,7 @@ export default function WritePage() {
                         {isShared ? 'みんなに共有' : '自分だけ'}
                     </p>
                     <h1 className="mb-5 text-2xl font-bold text-zinc-950">{title || 'タイトル'}</h1>
-                    {imagePreviewUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={imagePreviewUrl}
-                            alt=""
-                            className="mb-5 max-h-64 w-full rounded-xl object-cover"
-                        />
-                    )}
-                    <MarkdownRenderer body={previewBody || '本文のプレビューがここに表示されます。'} />
+                    <MarkdownRenderer body={body || '本文のプレビューがここに表示されます。'} />
                 </aside>
             </section>
 
