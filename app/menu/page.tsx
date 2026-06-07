@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -13,6 +14,36 @@ import { MobileNav } from '../components/MobileNav'
 import { profileFromUserMetadata, syncProfile } from '../utils/profiles'
 import type { Profile } from '../utils/types'
 
+const installSteps = [
+    {
+        title: '共有アイコンをタップ',
+        description: 'Safariの下にある共有メニューを開きます。',
+        image: {
+            src: '/pwa-install/ios-share.png',
+            width: 1206,
+            height: 1547,
+        },
+    },
+    {
+        title: 'ホーム画面に追加をタップ',
+        description: '共有メニューの中から「ホーム画面に追加」を選びます。',
+        image: {
+            src: '/pwa-install/ios-add-to-home.png',
+            width: 1206,
+            height: 1838,
+        },
+    },
+    {
+        title: '追加をタップ',
+        description: '右上の「追加」を押すと、ホーム画面からUchiLogを開けます。',
+        image: {
+            src: '/pwa-install/ios-add.png',
+            width: 1206,
+            height: 1026,
+        },
+    },
+]
+
 export default function MenuPage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
@@ -25,6 +56,9 @@ export default function MenuPage() {
     const [isEditingProfile, setIsEditingProfile] = useState(false)
     const [isSavingProfile, setIsSavingProfile] = useState(false)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
+    const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false)
+    const [installStepIndex, setInstallStepIndex] = useState(0)
+    const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
     const setProfileForm = (nextProfile: Profile | null) => {
         setProfile(nextProfile)
@@ -137,6 +171,29 @@ export default function MenuPage() {
         router.replace('/timeline')
     }
 
+    const openInstallGuide = () => {
+        setInstallStepIndex(0)
+        setIsInstallGuideOpen(true)
+    }
+
+    const goToInstallStep = (nextStepIndex: number) => {
+        setInstallStepIndex(Math.min(Math.max(nextStepIndex, 0), installSteps.length - 1))
+    }
+
+    const handleInstallGuideTouchEnd = (clientX: number) => {
+        if (touchStartX === null) {
+            return
+        }
+
+        const swipeDistance = touchStartX - clientX
+
+        if (Math.abs(swipeDistance) > 40) {
+            goToInstallStep(installStepIndex + (swipeDistance > 0 ? 1 : -1))
+        }
+
+        setTouchStartX(null)
+    }
+
     if (!isLoading && !user) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-5">
@@ -240,6 +297,18 @@ export default function MenuPage() {
                         タイムラインではタイトルだけを気軽に眺めて、詳細では本文をゆっくり読めます。<br></br>
                         Copyright © 2026 s1gnsgrfu. All rights reserved.
                     </p>
+                    <button
+                        onClick={openInstallGuide}
+                        className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-100"
+                    >
+                        <span className="min-w-0">
+                            <span className="block text-sm font-bold text-zinc-950">アプリとして使うには？</span>
+                            <span className="mt-1 block text-sm leading-6 text-zinc-500">
+                                iPhoneのホーム画面に追加する手順を確認できます。
+                            </span>
+                        </span>
+                        <span className="shrink-0 pl-3 text-xl text-zinc-400">→</span>
+                    </button>
                 </section>
 
                 <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
@@ -268,6 +337,101 @@ export default function MenuPage() {
                     onCancel={() => setIsLogoutConfirmOpen(false)}
                     onConfirm={logout}
                 />
+            )}
+
+            {isInstallGuideOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 px-3 py-5 backdrop-blur-[1px] sm:px-5"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="install-guide-title"
+                >
+                    <section className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-white/20">
+                        <div className="border-b border-zinc-100 px-5 py-4">
+                            <p className="text-xs font-semibold text-zinc-500">
+                                {installStepIndex + 1} / {installSteps.length}
+                            </p>
+                            <h2 id="install-guide-title" className="mt-1 text-xl font-bold text-zinc-950">
+                                {installSteps[installStepIndex].title}
+                            </h2>
+                            <p className="mt-1 text-sm leading-6 text-zinc-500">
+                                {installSteps[installStepIndex].description}
+                            </p>
+                        </div>
+
+                        <div
+                            className="min-h-0 flex-1 overflow-hidden bg-zinc-100"
+                            onTouchStart={(event) => setTouchStartX(event.changedTouches[0]?.clientX ?? null)}
+                            onTouchEnd={(event) => handleInstallGuideTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+                        >
+                            <div
+                                className="flex h-full transition-transform duration-300 ease-out"
+                                style={{ transform: `translateX(-${installStepIndex * 100}%)` }}
+                            >
+                                {installSteps.map((step) => (
+                                    <div key={step.title} className="flex min-w-full items-center justify-center p-3">
+                                        <div className="relative flex h-[54vh] max-h-[560px] min-h-[320px] w-full items-center justify-center sm:h-[600px]">
+                                            <Image
+                                                src={step.image.src}
+                                                alt={step.title}
+                                                width={step.image.width}
+                                                height={step.image.height}
+                                                className="max-h-full w-auto rounded-xl object-contain shadow-sm"
+                                                priority={step === installSteps[0]}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 px-5 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => goToInstallStep(installStepIndex - 1)}
+                                    disabled={installStepIndex === 0}
+                                    className="h-10 w-10 rounded-full border border-zinc-200 text-lg font-semibold text-zinc-700 disabled:text-zinc-300"
+                                    aria-label="前の手順"
+                                >
+                                    ←
+                                </button>
+
+                                <div className="flex items-center justify-center gap-2">
+                                    {installSteps.map((step, index) => (
+                                        <button
+                                            key={step.title}
+                                            type="button"
+                                            onClick={() => goToInstallStep(index)}
+                                            className={`h-2.5 rounded-full transition-all ${
+                                                index === installStepIndex ? 'w-6 bg-zinc-950' : 'w-2.5 bg-zinc-300'
+                                            }`}
+                                            aria-label={`${index + 1}番目の手順を表示`}
+                                        />
+                                    ))}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => goToInstallStep(installStepIndex + 1)}
+                                    disabled={installStepIndex === installSteps.length - 1}
+                                    className="h-10 w-10 rounded-full border border-zinc-200 text-lg font-semibold text-zinc-700 disabled:text-zinc-300"
+                                    aria-label="次の手順"
+                                >
+                                    →
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsInstallGuideOpen(false)}
+                                className="w-full rounded-full bg-zinc-950 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+                            >
+                                閉じる
+                            </button>
+                        </div>
+                    </section>
+                </div>
             )}
         </main>
     )
