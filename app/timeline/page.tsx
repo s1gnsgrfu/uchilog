@@ -42,7 +42,10 @@ export default function TimelinePage() {
     const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
 
     const scrollToLatest = useCallback(() => {
-        timelineEndRef.current?.scrollIntoView({ block: 'end' })
+        window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'auto',
+        })
     }, [])
 
     const fetchTimeline = useCallback(async (currentUser: User, currentProfile: Profile | null) => {
