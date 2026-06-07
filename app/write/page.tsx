@@ -119,7 +119,7 @@ export default function WritePage() {
             throw new Error('画像のアップロードに失敗しました')
         }
 
-        return await response.json() as { imageId: string; thumbUrl: string; displayUrl: string }
+        return await response.json() as { imageName: string; thumbUrl: string; displayUrl: string }
     }
 
     const captureBodySelection = () => {
@@ -168,7 +168,7 @@ export default function WritePage() {
 
         try {
             const uploadedImage = await uploadDiaryImage(file)
-            insertTextIntoBody(`[[画像:日記画像:${uploadedImage.imageId}]]`)
+            insertTextIntoBody(`[[画像:${uploadedImage.imageName}]]`)
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : '画像のアップロードに失敗しました'
             setMessage(errorMessage)

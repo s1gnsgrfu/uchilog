@@ -5,7 +5,7 @@ const MAX_THUMB_SIZE = 512 * 1024
 const MAX_DISPLAY_SIZE = 3 * 1024 * 1024
 
 type UploadResult = {
-    imageId: string
+    imageName: string
     thumbUrl: string
     displayUrl: string
 }
@@ -52,6 +52,41 @@ function isValidWebpFile(value: FormDataEntryValue | null, maxSize: number): val
         && value.size <= maxSize
 }
 
+function getSafeImageBaseName(originalName: string) {
+    const fileName = originalName.split(/[/\\]/).pop() ?? ''
+    const baseName = fileName.replace(/\.[^.]+$/, '')
+    const safeBaseName = baseName
+        .normalize('NFC')
+        .replace(/[\\/:*?"<>|#%[\]\u0000-\u001f]/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 80)
+
+    return safeBaseName || 'image'
+}
+
+async function createUniqueImageName(
+    bucket: Awaited<ReturnType<typeof getDiaryImagesBucket>>,
+    userId: string,
+    originalName: string
+) {
+    const baseName = getSafeImageBaseName(originalName)
+
+    for (let index = 0; index < 50; index += 1) {
+        const suffix = index === 0 ? '' : `-${index + 1}`
+        const imageName = `${baseName}${suffix}.webp`
+        const displayKey = `diaries/${userId}/${imageName}/display.webp`
+        const existingObject = await bucket.get(displayKey)
+
+        if (!existingObject) {
+            return imageName
+        }
+    }
+
+    return `${baseName}-${crypto.randomUUID().slice(0, 8)}.webp`
+}
+
 export async function POST(request: Request) {
     try {
         const userId = await getAuthenticatedUserId(request)
@@ -77,8 +112,9 @@ export async function POST(request: Request) {
         }
 
         const bucket = await getDiaryImagesBucket()
-        const imageId = crypto.randomUUID()
-        const keyPrefix = `diaries/${userId}/${imageId}`
+        const imageName = await createUniqueImageName(bucket, userId, originalName)
+        const encodedImageName = encodeURIComponent(imageName)
+        const keyPrefix = `diaries/${userId}/${imageName}`
         const thumbKey = `${keyPrefix}/thumb.webp`
         const displayKey = `${keyPrefix}/display.webp`
         const cacheControl = 'public, max-age=31536000, immutable'
@@ -91,6 +127,7 @@ export async function POST(request: Request) {
                 },
                 customMetadata: {
                     userId,
+                    imageName,
                     originalName,
                     variant: 'thumb',
                 },
@@ -102,6 +139,7 @@ export async function POST(request: Request) {
                 },
                 customMetadata: {
                     userId,
+                    imageName,
                     originalName,
                     variant: 'display',
                 },
@@ -109,9 +147,9 @@ export async function POST(request: Request) {
         ])
 
         const result: UploadResult = {
-            imageId,
-            thumbUrl: `/api/images/${thumbKey}`,
-            displayUrl: `/api/images/${displayKey}`,
+            imageName,
+            thumbUrl: `/api/images/diaries/${userId}/${encodedImageName}/thumb.webp`,
+            displayUrl: `/api/images/diaries/${userId}/${encodedImageName}/display.webp`,
         }
 
         return Response.json(result)

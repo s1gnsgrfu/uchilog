@@ -1,10 +1,19 @@
 export const getFirstMarkdownImage = (body: string, imageOwnerId?: string) => {
-    const diaryImageMatch = body.match(/\[\[画像:(.*?):([0-9a-f-]{36})]]/)
+    const legacyDiaryImageMatch = body.match(/\[\[画像:(.*?):([0-9a-f-]{36})]]/)
+
+    if (legacyDiaryImageMatch && imageOwnerId) {
+        return {
+            alt: legacyDiaryImageMatch[1] || '日記画像',
+            src: `/api/images/diaries/${imageOwnerId}/${legacyDiaryImageMatch[2]}/display.webp`,
+        }
+    }
+
+    const diaryImageMatch = body.match(/\[\[画像:([^\]\n]+)]]/)
 
     if (diaryImageMatch && imageOwnerId) {
         return {
-            alt: diaryImageMatch[1] || '日記画像',
-            src: `/api/images/diaries/${imageOwnerId}/${diaryImageMatch[2]}/display.webp`,
+            alt: diaryImageMatch[1].replace(/\.webp$/i, '') || '日記画像',
+            src: `/api/images/diaries/${imageOwnerId}/${encodeURIComponent(diaryImageMatch[1])}/display.webp`,
         }
     }
 
