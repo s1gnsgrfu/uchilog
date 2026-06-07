@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
@@ -32,6 +32,7 @@ const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs =
 }
 
 export default function TimelinePage() {
+    const timelineEndRef = useRef<HTMLDivElement | null>(null)
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [diaries, setDiaries] = useState<DiaryWithAuthor[]>([])
@@ -39,6 +40,13 @@ export default function TimelinePage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
     const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
+
+    const scrollToLatest = useCallback(() => {
+        window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'auto',
+        })
+    }, [])
 
     const fetchTimeline = useCallback(async (currentUser: User, currentProfile: Profile | null) => {
         const { data, error } = await supabase
@@ -140,6 +148,18 @@ export default function TimelinePage() {
             isMounted = false
         }
     }, [fetchTimeline])
+
+    useEffect(() => {
+        if (!user || isLoading || diaries.length === 0) {
+            return
+        }
+
+        const frameId = requestAnimationFrame(scrollToLatest)
+
+        return () => {
+            cancelAnimationFrame(frameId)
+        }
+    }, [diaries.length, isLoading, scrollToLatest, user])
 
     const groupedDiaries = useMemo(() => {
         const groups: { dateKey: string; label: string; diaries: DiaryWithAuthor[] }[] = []
@@ -306,6 +326,7 @@ export default function TimelinePage() {
                                                             width={120}
                                                             height={80}
                                                             unoptimized
+                                                            onLoad={scrollToLatest}
                                                             className="h-20 w-28 rounded-xl object-cover ring-1 ring-black/5"
                                                         />
                                                     )}
@@ -318,6 +339,7 @@ export default function TimelinePage() {
                                 })}
                             </div>
                         ))}
+                        <div ref={timelineEndRef} aria-hidden="true" className="h-1" />
                     </div>
                 )}
             </section>
