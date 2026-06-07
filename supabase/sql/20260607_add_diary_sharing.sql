@@ -1,5 +1,8 @@
 alter table public.diaries
-add column if not exists is_shared boolean not null default false;
+add column if not exists is_shared boolean not null default true;
+
+alter table public.diaries
+alter column is_shared set default true;
 
 drop policy if exists "Users can view own diaries" on public.diaries;
 

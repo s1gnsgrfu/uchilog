@@ -17,7 +17,7 @@ export default function WritePage() {
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
     const [imageUrl, setImageUrl] = useState('')
-    const [isShared, setIsShared] = useState(false)
+    const [isShared, setIsShared] = useState(true)
     const [message, setMessage] = useState('')
     const [fieldErrors, setFieldErrors] = useState({ title: '', body: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
