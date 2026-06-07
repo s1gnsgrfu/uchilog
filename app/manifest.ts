@@ -12,6 +12,18 @@ export default function manifest(): MetadataRoute.Manifest {
         theme_color: '#fbf9f4',
         icons: [
             {
+                src: '/icon-192.png',
+                sizes: '192x192',
+                type: 'image/png',
+                purpose: 'any',
+            },
+            {
+                src: '/icon-512.png',
+                sizes: '512x512',
+                type: 'image/png',
+                purpose: 'any',
+            },
+            {
                 src: '/uchilog-icon.svg',
                 sizes: '512x512',
                 type: 'image/svg+xml',
