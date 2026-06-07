@@ -94,6 +94,7 @@ export async function POST(request: Request) {
         })
 
         let sent = 0
+        let failed = 0
         const expiredSubscriptionIds: string[] = []
 
         await Promise.all(subscriptions.map(async (subscription) => {
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
                 )
                 sent += 1
             } catch (error) {
+                failed += 1
                 if (isExpiredSubscriptionError(error)) {
                     expiredSubscriptionIds.push(subscription.id)
                 }
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
                 .in('id', expiredSubscriptionIds)
         }
 
-        return Response.json({ ok: true, sent })
+        return Response.json({ ok: true, sent, failed, expired: expiredSubscriptionIds.length })
     } catch {
         return Response.json({ error: 'notification_failed' }, { status: 500 })
     }

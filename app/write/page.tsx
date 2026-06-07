@@ -216,7 +216,7 @@ export default function WritePage() {
             }
 
             if (data?.is_shared) {
-                void notifyDiaryCreated(data.id)
+                await notifyDiaryCreated(data.id)
             }
 
             router.push('/timeline')
@@ -236,14 +236,18 @@ export default function WritePage() {
             return
         }
 
-        await fetch('/api/push/notify', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ diaryId }),
-        })
+        try {
+            await fetch('/api/push/notify', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ diaryId }),
+            })
+        } catch {
+            // 通知に失敗しても、日記投稿自体は成功扱いにする。
+        }
     }
 
     const insertMarkdown = (example: string) => {
