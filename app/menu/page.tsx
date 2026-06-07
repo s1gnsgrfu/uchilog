@@ -290,6 +290,19 @@ export default function MenuPage() {
                     </section>
                 )}
 
+                <button
+                    onClick={openInstallGuide}
+                    className="flex w-full items-center justify-between rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                    <span className="min-w-0">
+                        <span className="block text-lg font-bold text-zinc-950">アプリとして使うには？</span>
+                        <span className="mt-1 block text-sm leading-6 text-zinc-500">
+                            iPhoneのホーム画面に追加する手順を確認できます。
+                        </span>
+                    </span>
+                    <span className="shrink-0 pl-3 text-xl text-zinc-400">→</span>
+                </button>
+
                 <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                     <h2 className="text-lg font-bold text-zinc-950">アプリについて</h2>
                     <p className="text-sm leading-7 text-zinc-600">
@@ -297,18 +310,6 @@ export default function MenuPage() {
                         タイムラインではタイトルだけを気軽に眺めて、詳細では本文をゆっくり読めます。<br></br>
                         Copyright © 2026 s1gnsgrfu. All rights reserved.
                     </p>
-                    <button
-                        onClick={openInstallGuide}
-                        className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-100"
-                    >
-                        <span className="min-w-0">
-                            <span className="block text-sm font-bold text-zinc-950">アプリとして使うには？</span>
-                            <span className="mt-1 block text-sm leading-6 text-zinc-500">
-                                iPhoneのホーム画面に追加する手順を確認できます。
-                            </span>
-                        </span>
-                        <span className="shrink-0 pl-3 text-xl text-zinc-400">→</span>
-                    </button>
                 </section>
 
                 <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
