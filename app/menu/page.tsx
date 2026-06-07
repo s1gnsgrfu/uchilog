@@ -44,6 +44,21 @@ const installSteps = [
     },
 ]
 
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
+
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+    const base64 = `${base64String}${padding}`.replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+
+    for (let index = 0; index < rawData.length; index += 1) {
+        outputArray[index] = rawData.charCodeAt(index)
+    }
+
+    return outputArray
+}
+
 export default function MenuPage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
@@ -59,6 +74,11 @@ export default function MenuPage() {
     const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false)
     const [installStepIndex, setInstallStepIndex] = useState(0)
     const [touchStartX, setTouchStartX] = useState<number | null>(null)
+    const [isNotificationSupported, setIsNotificationSupported] = useState(false)
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
+    const [notificationSubscription, setNotificationSubscription] = useState<PushSubscription | null>(null)
+    const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false)
+    const [notificationMessage, setNotificationMessage] = useState('')
 
     const setProfileForm = (nextProfile: Profile | null) => {
         setProfile(nextProfile)
@@ -109,6 +129,42 @@ export default function MenuPage() {
         }
     }, [])
 
+    useEffect(() => {
+        let isMounted = true
+
+        const setupNotifications = async () => {
+            if (!user || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+                setIsNotificationSupported(false)
+                return
+            }
+
+            setIsNotificationSupported(true)
+            setNotificationPermission(Notification.permission)
+
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js', {
+                    scope: '/',
+                    updateViaCache: 'none',
+                })
+                const subscription = await registration.pushManager.getSubscription()
+
+                if (isMounted) {
+                    setNotificationSubscription(subscription)
+                }
+            } catch {
+                if (isMounted) {
+                    setNotificationMessage('通知の準備に失敗しました')
+                }
+            }
+        }
+
+        void setupNotifications()
+
+        return () => {
+            isMounted = false
+        }
+    }, [user])
+
     const saveProfile = async () => {
         if (!user) {
             setMessage('ログインしてください')
@@ -156,6 +212,104 @@ export default function MenuPage() {
         setDisplayName(defaultProfile.display_name)
         setAvatarUrl(defaultProfile.avatar_url ?? '')
         setBio('')
+    }
+
+    const getAccessToken = async () => {
+        const { data } = await supabase.auth.getSession()
+        return data.session?.access_token ?? null
+    }
+
+    const enableNotifications = async () => {
+        if (!isNotificationSupported) {
+            setNotificationMessage('この環境では通知が使えません')
+            return
+        }
+
+        if (!vapidPublicKey) {
+            setNotificationMessage('通知用の公開キーが設定されていません')
+            return
+        }
+
+        setIsUpdatingNotifications(true)
+        setNotificationMessage('')
+
+        try {
+            const permission = await Notification.requestPermission()
+            setNotificationPermission(permission)
+
+            if (permission !== 'granted') {
+                setNotificationMessage('通知が許可されませんでした')
+                return
+            }
+
+            const accessToken = await getAccessToken()
+
+            if (!accessToken) {
+                setNotificationMessage('ログインしてください')
+                return
+            }
+
+            const registration = await navigator.serviceWorker.ready
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+            })
+
+            const response = await fetch('/api/push/subscriptions', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ subscription }),
+            })
+
+            if (!response.ok) {
+                await subscription.unsubscribe()
+                throw new Error('subscription_save_failed')
+            }
+
+            setNotificationSubscription(subscription)
+            setNotificationMessage('通知をオンにしました')
+        } catch {
+            setNotificationMessage('通知をオンにできませんでした')
+        } finally {
+            setIsUpdatingNotifications(false)
+        }
+    }
+
+    const disableNotifications = async () => {
+        const subscription = notificationSubscription
+
+        if (!subscription) {
+            return
+        }
+
+        setIsUpdatingNotifications(true)
+        setNotificationMessage('')
+
+        try {
+            const accessToken = await getAccessToken()
+
+            if (accessToken) {
+                await fetch('/api/push/subscriptions', {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ endpoint: subscription.endpoint }),
+                })
+            }
+
+            await subscription.unsubscribe()
+            setNotificationSubscription(null)
+            setNotificationMessage('通知をオフにしました')
+        } catch {
+            setNotificationMessage('通知をオフにできませんでした')
+        } finally {
+            setIsUpdatingNotifications(false)
+        }
     }
 
     const logout = async () => {
@@ -289,6 +443,41 @@ export default function MenuPage() {
                         </div>
                     </section>
                 )}
+
+                <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                    <div>
+                        <h2 className="text-lg font-bold text-zinc-950">通知設定</h2>
+                        <p className="mt-1 text-sm leading-6 text-zinc-500">
+                            他の人が日記を投稿したときに通知を受け取れます。iPhoneではホーム画面に追加したアプリで使えます。
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-zinc-700">
+                            {notificationSubscription ? '通知はオンです' : '通知はオフです'}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={notificationSubscription ? disableNotifications : enableNotifications}
+                            disabled={!isNotificationSupported || isUpdatingNotifications || notificationPermission === 'denied'}
+                            className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:bg-zinc-400"
+                        >
+                            {isUpdatingNotifications
+                                ? '変更中'
+                                : notificationSubscription
+                                    ? '通知をオフ'
+                                    : '通知をオン'}
+                        </button>
+                    </div>
+                    {!isNotificationSupported && (
+                        <p className="text-xs font-semibold text-red-600">この環境では通知が使えません。</p>
+                    )}
+                    {notificationPermission === 'denied' && (
+                        <p className="text-xs font-semibold text-red-600">通知がブラウザ側でブロックされています。</p>
+                    )}
+                    {notificationMessage && (
+                        <p className="text-xs font-semibold text-zinc-600">{notificationMessage}</p>
+                    )}
+                </section>
 
                 <button
                     onClick={openInstallGuide}
