@@ -162,7 +162,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                     )}
 
                     <h1 className="mb-8 text-4xl font-bold leading-tight text-zinc-950">{diary.title}</h1>
-                    <MarkdownRenderer body={diary.body} />
+                    <MarkdownRenderer body={diary.body} imageOwnerId={diary.user_id} />
                 </div>
             </article>
 
