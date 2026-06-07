@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { AppHeader } from '../components/AppHeader'
 import { AppLink } from '../components/AppLink'
+import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { MobileNav } from '../components/MobileNav'
@@ -182,12 +183,7 @@ export default function WritePage() {
         <main className="min-h-screen bg-[#f6f1e8]">
             <AppHeader
                 actions={
-                    <button
-                        onClick={() => setIsLogoutConfirmOpen(true)}
-                        className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-950"
-                    >
-                        ログアウト
-                    </button>
+                    <DesktopHeaderActions showWrite={false} onLogout={() => setIsLogoutConfirmOpen(true)} />
                 }
             />
 
