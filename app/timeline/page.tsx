@@ -363,9 +363,9 @@ export default function TimelinePage() {
             <section className="mx-auto max-w-3xl px-3 pb-36 pt-6 sm:pb-6">
                 {message && <p className="mb-4 rounded-xl bg-white px-4 py-3 text-sm text-red-600 shadow-sm">{message}</p>}
 
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 text-sm shadow-sm ring-1 ring-black/5">
-                    <div className="min-w-0 space-y-1">
-                        <p className="font-semibold text-zinc-700">{lastUpdatedLabel}</p>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/90 px-3 py-2 text-sm shadow-sm ring-1 ring-black/5">
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-700">{lastUpdatedLabel}</p>
                         {isRefreshing && <p className="text-xs font-semibold text-zinc-500">更新中...</p>}
                         {refreshNotice && <p className="text-xs font-semibold text-emerald-700">{refreshNotice}</p>}
                         {refreshError && <p className="text-xs font-semibold text-red-600">{refreshError}</p>}
@@ -374,7 +374,7 @@ export default function TimelinePage() {
                         type="button"
                         onClick={() => void refreshTimeline(true)}
                         disabled={isRefreshing}
-                        className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-bold text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-950 disabled:text-zinc-300"
+                        className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-950 disabled:text-zinc-300"
                     >
                         {isRefreshing ? '更新中' : '更新'}
                     </button>
