@@ -23,6 +23,8 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
     const [message, setMessage] = useState('')
     const [isLoading, setIsLoading] = useState(true)
     const [isUpdatingShare, setIsUpdatingShare] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
 
     useEffect(() => {
@@ -81,6 +83,32 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
 
         setDiary({ ...diary, is_shared: nextShared })
         setMessage(nextShared ? 'この日記を共有しました' : 'この日記を自分だけに戻しました')
+    }
+
+    const deleteDiary = async () => {
+        if (!user || !diary || diary.user_id !== user.id) {
+            setMessage('この日記は削除できません')
+            return
+        }
+
+        setIsDeleting(true)
+        setMessage('')
+
+        const { error } = await supabase
+            .from('diaries')
+            .delete()
+            .eq('id', diary.id)
+            .eq('user_id', user.id)
+
+        setIsDeleting(false)
+
+        if (error) {
+            setMessage(`日記の削除に失敗しました: ${error.message}`)
+            return
+        }
+
+        setIsDeleteConfirmOpen(false)
+        router.replace('/timeline')
     }
 
     const logout = async () => {
@@ -150,13 +178,20 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                     )}
 
                     {isOwnDiary && (
-                        <div className="mb-8 flex justify-end">
+                        <div className="mb-8 flex flex-wrap justify-end gap-2">
                             <button
                                 onClick={toggleSharing}
-                                disabled={isUpdatingShare}
+                                disabled={isUpdatingShare || isDeleting}
                                 className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-950 disabled:text-zinc-400"
                             >
                                 {isUpdatingShare ? '変更中' : diary.is_shared ? '自分だけに戻す' : 'みんなに共有する'}
+                            </button>
+                            <button
+                                onClick={() => setIsDeleteConfirmOpen(true)}
+                                disabled={isDeleting || isUpdatingShare}
+                                className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:text-red-300"
+                            >
+                                削除
                             </button>
                         </div>
                     )}
@@ -173,6 +208,48 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                     onCancel={() => setIsLogoutConfirmOpen(false)}
                     onConfirm={logout}
                 />
+            )}
+
+            {isDeleteConfirmOpen && (
+                <div
+                    onClick={() => {
+                        if (!isDeleting) {
+                            setIsDeleteConfirmOpen(false)
+                        }
+                    }}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-6"
+                >
+                    <section
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-diary-title"
+                        onClick={(event) => event.stopPropagation()}
+                        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+                    >
+                        <h2 id="delete-diary-title" className="text-lg font-bold text-zinc-950">
+                            日記を削除しますか？
+                        </h2>
+                        <p className="mt-2 text-sm leading-6 text-zinc-500">
+                            削除した日記はタイムラインや詳細画面から見られなくなります。
+                        </p>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button
+                                onClick={() => setIsDeleteConfirmOpen(false)}
+                                disabled={isDeleting}
+                                className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 hover:border-zinc-400 hover:text-zinc-950 disabled:text-zinc-300"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={deleteDiary}
+                                disabled={isDeleting}
+                                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+                            >
+                                {isDeleting ? '削除中' : '削除する'}
+                            </button>
+                        </div>
+                    </section>
+                </div>
             )}
         </main>
     )
