@@ -10,6 +10,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+For Cloudflare Workers deploys, set runtime variables and secrets in Cloudflare. This project sets `keep_vars: true` in `wrangler.jsonc` so Dashboard-managed variables are not removed by the next Wrangler/OpenNext deploy.
+
 First, run the development server:
 
 ```bash
