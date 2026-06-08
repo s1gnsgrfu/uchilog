@@ -496,7 +496,7 @@ export default function MenuPage() {
                     <h2 className="text-lg font-bold text-zinc-950">アプリについて</h2>
                     <p className="text-sm leading-7 text-zinc-600">
                         UchiLogは、身内で日記を共有するためのライフログサービスです。
-                        タイムラインではタイトルだけを気軽に眺めて、詳細では本文をゆっくり読めます。<br></br>
+                        タイムラインではタイトルだけを気軽に眺めて、チャットをクリックすると本文をゆっくり読めます。<br></br>
                         Copyright © 2026 s1gnsgrfu. All rights reserved.
                     </p>
                 </section>
