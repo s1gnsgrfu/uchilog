@@ -1,5 +1,3 @@
-export const ALLOWED_DISCORD_GUILD_ID = '695466655152734228'
-
 export const DISCORD_LOGIN_SCOPES = 'identify email guilds'
 
 export const authErrorMessages: Record<string, string> = {

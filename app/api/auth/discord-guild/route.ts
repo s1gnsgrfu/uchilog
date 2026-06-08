@@ -1,11 +1,18 @@
-import { ALLOWED_DISCORD_GUILD_ID } from '../../../utils/auth'
-
 type DiscordGuild = {
     id?: string
 }
 
 export async function POST(request: Request) {
     try {
+        const allowedDiscordGuildId = process.env.DISCORD_GUILD_ID?.trim()
+
+        if (!allowedDiscordGuildId) {
+            return Response.json(
+                { allowed: false, error: 'discord_guild_not_configured' },
+                { status: 500 }
+            )
+        }
+
         const body = await request.json() as { providerToken?: unknown }
         const providerToken = body.providerToken
 
@@ -31,7 +38,7 @@ export async function POST(request: Request) {
         }
 
         const guilds = await discordResponse.json() as DiscordGuild[]
-        const allowed = Array.isArray(guilds) && guilds.some((guild) => guild.id === ALLOWED_DISCORD_GUILD_ID)
+        const allowed = Array.isArray(guilds) && guilds.some((guild) => guild.id === allowedDiscordGuildId)
 
         return Response.json({ allowed })
     } catch {
