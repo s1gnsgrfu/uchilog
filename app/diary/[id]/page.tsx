@@ -13,7 +13,9 @@ import { MarkdownRenderer } from '../../components/MarkdownRenderer'
 import { MobileNav } from '../../components/MobileNav'
 import { formatDateTime } from '../../utils/format'
 import { fetchProfilesByIds } from '../../utils/profiles'
-import type { Diary, DiaryWithAuthor } from '../../utils/types'
+import type { Diary, DiaryReaction, DiaryReactionSummary, DiaryWithAuthor } from '../../utils/types'
+
+const LIKE_REACTION = 'like'
 
 export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -21,8 +23,13 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
     const [user, setUser] = useState<User | null>(null)
     const [diary, setDiary] = useState<DiaryWithAuthor | null>(null)
     const [message, setMessage] = useState('')
+    const [reactionSummary, setReactionSummary] = useState<DiaryReactionSummary>({
+        count: 0,
+        reactedByCurrentUser: false,
+    })
     const [isLoading, setIsLoading] = useState(true)
     const [isUpdatingShare, setIsUpdatingShare] = useState(false)
+    const [isUpdatingReaction, setIsUpdatingReaction] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
@@ -45,11 +52,30 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
             }
 
             const diaryRow = data as Diary
-            const profileMap = await fetchProfilesByIds([diaryRow.user_id])
+            const [{ data: reactionData, error: reactionError }, profileMap] = await Promise.all([
+                supabase
+                    .from('diary_reactions')
+                    .select('diary_id,user_id,reaction,created_at')
+                    .eq('diary_id', diaryRow.id)
+                    .eq('reaction', LIKE_REACTION),
+                fetchProfilesByIds([diaryRow.user_id]),
+            ])
+
+            if (reactionError) {
+                setMessage(`リアクションの取得に失敗しました: ${reactionError.message}`)
+                setIsLoading(false)
+                return
+            }
+
+            const reactions = (reactionData ?? []) as DiaryReaction[]
 
             setDiary({
                 ...diaryRow,
                 author: profileMap.get(diaryRow.user_id) ?? null,
+            })
+            setReactionSummary({
+                count: reactions.length,
+                reactedByCurrentUser: reactions.some((reaction) => reaction.user_id === sessionData.session?.user.id),
             })
             setIsLoading(false)
         }
@@ -83,6 +109,45 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
 
         setDiary({ ...diary, is_shared: nextShared })
         setMessage(nextShared ? 'この日記を共有しました' : 'この日記を自分だけに戻しました')
+    }
+
+    const toggleReaction = async () => {
+        if (!user || !diary || isUpdatingReaction) {
+            return
+        }
+
+        setIsUpdatingReaction(true)
+        setMessage('')
+
+        const reactionQuery = supabase.from('diary_reactions')
+        const { error } = reactionSummary.reactedByCurrentUser
+            ? await reactionQuery
+                .delete()
+                .eq('diary_id', diary.id)
+                .eq('user_id', user.id)
+                .eq('reaction', LIKE_REACTION)
+            : await reactionQuery
+                .insert({
+                    diary_id: diary.id,
+                    user_id: user.id,
+                    reaction: LIKE_REACTION,
+                })
+
+        setIsUpdatingReaction(false)
+
+        if (error) {
+            setMessage(`リアクションの更新に失敗しました: ${error.message}`)
+            return
+        }
+
+        setReactionSummary((current) => {
+            const nextReacted = !current.reactedByCurrentUser
+
+            return {
+                count: Math.max(0, current.count + (nextReacted ? 1 : -1)),
+                reactedByCurrentUser: nextReacted,
+            }
+        })
     }
 
     const deleteDiary = async () => {
@@ -198,6 +263,23 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
 
                     <h1 className="mb-8 text-4xl font-bold leading-tight text-zinc-950">{diary.title}</h1>
                     <MarkdownRenderer body={diary.body} imageOwnerId={diary.user_id} />
+                    <div className="mt-8 border-t border-zinc-100 pt-5">
+                        <button
+                            type="button"
+                            onClick={() => void toggleReaction()}
+                            disabled={isUpdatingReaction}
+                            aria-pressed={reactionSummary.reactedByCurrentUser}
+                            aria-label={reactionSummary.reactedByCurrentUser ? 'いいねを取り消す' : 'いいねする'}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold shadow-sm ring-1 transition disabled:opacity-60 ${
+                                reactionSummary.reactedByCurrentUser
+                                    ? 'bg-amber-100 text-amber-800 ring-amber-200 hover:bg-amber-200'
+                                    : 'bg-white text-zinc-500 ring-zinc-200 hover:text-zinc-950'
+                            }`}
+                        >
+                            <span aria-hidden="true">👍</span>
+                            <span>{reactionSummary.count}</span>
+                        </button>
+                    </div>
                 </div>
             </article>
 
