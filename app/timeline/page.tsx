@@ -14,9 +14,27 @@ import { fetchProfilesByIds, syncProfile } from '../utils/profiles'
 import { DISCORD_LOGIN_SCOPES, authErrorMessages } from '../utils/auth'
 import { formatDateLabel, formatJoinedDate, getDateKey } from '../utils/format'
 import { getFirstMarkdownImage, getTimelineThumbnailUrl } from '../utils/markdown'
-import type { Diary, DiaryWithAuthor, Profile } from '../utils/types'
+import type { Diary, DiaryReaction, DiaryReactionSummary, DiaryWithAuthor, Profile } from '../utils/types'
 
 const TIMELINE_REFRESH_INTERVAL_MS = 30 * 1000
+const LIKE_REACTION = 'like'
+
+const buildReactionSummaries = (reactions: DiaryReaction[], currentUserId: string) => {
+    const summaries: Record<string, DiaryReactionSummary> = {}
+
+    reactions.forEach((reaction) => {
+        const summary = summaries[reaction.diary_id] ?? {
+            count: 0,
+            reactedByCurrentUser: false,
+        }
+
+        summary.count += 1
+        summary.reactedByCurrentUser = summary.reactedByCurrentUser || reaction.user_id === currentUserId
+        summaries[reaction.diary_id] = summary
+    })
+
+    return summaries
+}
 
 const withTimeout = async <T,>(promise: Promise<T>, message: string, timeoutMs = 10000) => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -42,6 +60,8 @@ export default function TimelinePage() {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [diaries, setDiaries] = useState<DiaryWithAuthor[]>([])
+    const [reactionSummaries, setReactionSummaries] = useState<Record<string, DiaryReactionSummary>>({})
+    const [pendingReactionIds, setPendingReactionIds] = useState<string[]>([])
     const [message, setMessage] = useState('')
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -69,6 +89,19 @@ export default function TimelinePage() {
         }
 
         const diaryRows = (data ?? []) as Diary[]
+        const diaryIds = diaryRows.map((diary) => diary.id)
+        const { data: reactionData, error: reactionError } = diaryIds.length > 0
+            ? await supabase
+                .from('diary_reactions')
+                .select('diary_id,user_id,reaction,created_at')
+                .in('diary_id', diaryIds)
+                .eq('reaction', LIKE_REACTION)
+            : { data: [], error: null }
+
+        if (reactionError) {
+            throw new Error(`リアクションの取得に失敗しました: ${reactionError.message}`)
+        }
+
         const profileMap = await fetchProfilesByIds([
             ...diaryRows.map((diary) => diary.user_id),
             currentUser.id,
@@ -84,6 +117,7 @@ export default function TimelinePage() {
                 author: profileMap.get(diary.user_id) ?? null,
             }))
         )
+        setReactionSummaries(buildReactionSummaries((reactionData ?? []) as DiaryReaction[], currentUser.id))
         setLastUpdatedAt(new Date())
     }, [])
 
@@ -193,6 +227,7 @@ export default function TimelinePage() {
                     setUser(null)
                     setProfile(null)
                     setDiaries([])
+                    setReactionSummaries({})
                     setLastUpdatedAt(null)
                     setRefreshError('')
                     setRefreshNotice('')
@@ -232,6 +267,7 @@ export default function TimelinePage() {
                 setUser(sessionUser)
                 setProfile(null)
                 setDiaries([])
+                setReactionSummaries({})
                 setLastUpdatedAt(null)
             } finally {
                 if (isMounted) {
@@ -306,10 +342,62 @@ export default function TimelinePage() {
         setUser(null)
         setProfile(null)
         setDiaries([])
+        setReactionSummaries({})
         setLastUpdatedAt(null)
         setRefreshError('')
         setRefreshNotice('')
         setIsLogoutConfirmOpen(false)
+    }
+
+    const toggleReaction = async (diaryId: string) => {
+        if (!user || pendingReactionIds.includes(diaryId)) {
+            return
+        }
+
+        const summary = reactionSummaries[diaryId] ?? {
+            count: 0,
+            reactedByCurrentUser: false,
+        }
+
+        setPendingReactionIds((current) => [...current, diaryId])
+        setMessage('')
+
+        const reactionQuery = supabase.from('diary_reactions')
+        const { error } = summary.reactedByCurrentUser
+            ? await reactionQuery
+                .delete()
+                .eq('diary_id', diaryId)
+                .eq('user_id', user.id)
+                .eq('reaction', LIKE_REACTION)
+            : await reactionQuery
+                .insert({
+                    diary_id: diaryId,
+                    user_id: user.id,
+                    reaction: LIKE_REACTION,
+                })
+
+        setPendingReactionIds((current) => current.filter((pendingDiaryId) => pendingDiaryId !== diaryId))
+
+        if (error) {
+            setMessage(`リアクションの更新に失敗しました: ${error.message}`)
+            return
+        }
+
+        setReactionSummaries((current) => {
+            const currentSummary = current[diaryId] ?? {
+                count: 0,
+                reactedByCurrentUser: false,
+            }
+            const nextReacted = !currentSummary.reactedByCurrentUser
+
+            return {
+                ...current,
+                [diaryId]: {
+                    count: Math.max(0, currentSummary.count + (nextReacted ? 1 : -1)),
+                    reactedByCurrentUser: nextReacted,
+                },
+            }
+        })
     }
 
     const lastUpdatedLabel = useMemo(() => {
@@ -401,6 +489,11 @@ export default function TimelinePage() {
                                     const authorName = diary.author?.display_name ?? (isOwn ? profile?.display_name : null) ?? '名無し'
                                     const thumbnail = getFirstMarkdownImage(diary.body, diary.user_id)
                                     const thumbnailSrc = thumbnail ? getTimelineThumbnailUrl(thumbnail.src) : null
+                                    const reactionSummary = reactionSummaries[diary.id] ?? {
+                                        count: 0,
+                                        reactedByCurrentUser: false,
+                                    }
+                                    const isReactionPending = pendingReactionIds.includes(diary.id)
 
                                     return (
                                         <div
@@ -449,6 +542,21 @@ export default function TimelinePage() {
                                                         />
                                                     )}
                                                 </AppLink>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void toggleReaction(diary.id)}
+                                                    disabled={isReactionPending}
+                                                    aria-pressed={reactionSummary.reactedByCurrentUser}
+                                                    aria-label={reactionSummary.reactedByCurrentUser ? 'いいねを取り消す' : 'いいねする'}
+                                                    className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ring-1 transition disabled:opacity-60 ${
+                                                        reactionSummary.reactedByCurrentUser
+                                                            ? 'bg-amber-100 text-amber-800 ring-amber-200 hover:bg-amber-200'
+                                                            : 'bg-white/90 text-zinc-500 ring-black/5 hover:text-zinc-950'
+                                                    }`}
+                                                >
+                                                    <span aria-hidden="true">👍</span>
+                                                    <span>{reactionSummary.count}</span>
+                                                </button>
                                             </div>
 
                                             {isOwn && <Avatar profile={profile} fallback={authorName} />}

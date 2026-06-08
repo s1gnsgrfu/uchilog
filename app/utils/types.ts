@@ -20,3 +20,15 @@ export type Diary = {
 export type DiaryWithAuthor = Diary & {
     author: Profile | null
 }
+
+export type DiaryReaction = {
+    diary_id: string
+    user_id: string
+    reaction: string
+    created_at: string
+}
+
+export type DiaryReactionSummary = {
+    count: number
+    reactedByCurrentUser: boolean
+}
