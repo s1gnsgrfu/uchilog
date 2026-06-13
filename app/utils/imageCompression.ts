@@ -1,3 +1,5 @@
+import { convertHeicToWebp, isHeicOrHeifImage } from '@/src/lib/image/convertHeicToWebp'
+
 export type DiaryImageFiles = {
     thumb: File
     display: File
@@ -7,33 +9,6 @@ const THUMB_WIDTH = 400
 const THUMB_QUALITY = 0.75
 const DISPLAY_WIDTH = 1600
 const DISPLAY_QUALITY = 0.8
-
-const isHeicImage = (file: File) => {
-    return file.type === 'image/heic'
-        || file.type === 'image/heif'
-        || /\.(heic|heif)$/i.test(file.name)
-}
-
-const normalizeImageFile = async (file: File) => {
-    if (!isHeicImage(file)) {
-        return file
-    }
-
-    try {
-        const { default: heic2any } = await import('heic2any')
-        const converted = await heic2any({
-            blob: file,
-            toType: 'image/jpeg',
-            quality: 0.92,
-        })
-        const convertedBlob = Array.isArray(converted) ? converted[0] : converted
-        const convertedName = file.name.replace(/\.(heic|heif)$/i, '.jpg')
-
-        return new File([convertedBlob], convertedName, { type: 'image/jpeg' })
-    } catch {
-        throw new Error('HEIC/HEIF画像を変換できませんでした。写真をJPEGまたはPNGに変換してから選択してください。')
-    }
-}
 
 const loadImage = (file: File) => new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image()
@@ -86,13 +61,13 @@ const resizeToWebp = async (
 }
 
 export const compressDiaryImage = async (file: File): Promise<DiaryImageFiles> => {
-    const imageFile = await normalizeImageFile(file)
+    const imageFile = await convertHeicToWebp(file)
     let source: HTMLImageElement
 
     try {
         source = await loadImage(imageFile)
     } catch {
-        if (isHeicImage(file)) {
+        if (isHeicOrHeifImage(file)) {
             throw new Error('HEIC/HEIF画像を読み込めませんでした。写真をJPEGまたはPNGに変換してから選択してください。')
         }
 
