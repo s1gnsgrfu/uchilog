@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { use, useEffect, useState } from 'react'
+import { use, useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { AppHeader } from '../../components/AppHeader'
@@ -13,7 +13,7 @@ import { MarkdownRenderer } from '../../components/MarkdownRenderer'
 import { MobileNav } from '../../components/MobileNav'
 import { formatDateTime } from '../../utils/format'
 import { fetchProfilesByIds } from '../../utils/profiles'
-import type { Diary, DiaryReaction, DiaryReactionSummary, DiaryWithAuthor } from '../../utils/types'
+import type { Diary, DiaryComment, DiaryCommentWithAuthor, DiaryReaction, DiaryReactionSummary, DiaryWithAuthor } from '../../utils/types'
 
 const LIKE_REACTION = 'like'
 
@@ -27,12 +27,36 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         count: 0,
         reactedByCurrentUser: false,
     })
+    const [comments, setComments] = useState<DiaryCommentWithAuthor[]>([])
+    const [commentBody, setCommentBody] = useState('')
     const [isLoading, setIsLoading] = useState(true)
     const [isUpdatingShare, setIsUpdatingShare] = useState(false)
     const [isUpdatingReaction, setIsUpdatingReaction] = useState(false)
+    const [isPostingComment, setIsPostingComment] = useState(false)
+    const [deletingCommentIds, setDeletingCommentIds] = useState<string[]>([])
     const [isDeleting, setIsDeleting] = useState(false)
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
+
+    const fetchComments = useCallback(async (diaryId: string) => {
+        const { data, error } = await supabase
+            .from('diary_comments')
+            .select('id,diary_id,user_id,body,created_at,updated_at')
+            .eq('diary_id', diaryId)
+            .order('created_at', { ascending: true })
+
+        if (error) {
+            throw error
+        }
+
+        const commentRows = (data ?? []) as DiaryComment[]
+        const profileMap = await fetchProfilesByIds(commentRows.map((comment) => comment.user_id))
+
+        return commentRows.map((comment) => ({
+            ...comment,
+            author: profileMap.get(comment.user_id) ?? null,
+        }))
+    }, [])
 
     useEffect(() => {
         const load = async () => {
@@ -52,13 +76,14 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
             }
 
             const diaryRow = data as Diary
-            const [{ data: reactionData, error: reactionError }, profileMap] = await Promise.all([
+            const [{ data: reactionData, error: reactionError }, profileMap, diaryComments] = await Promise.all([
                 supabase
                     .from('diary_reactions')
                     .select('diary_id,user_id,reaction,created_at')
                     .eq('diary_id', diaryRow.id)
                     .eq('reaction', LIKE_REACTION),
                 fetchProfilesByIds([diaryRow.user_id]),
+                fetchComments(diaryRow.id).catch(() => []),
             ])
 
             if (reactionError) {
@@ -77,11 +102,12 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 count: reactions.length,
                 reactedByCurrentUser: reactions.some((reaction) => reaction.user_id === sessionData.session?.user.id),
             })
+            setComments(diaryComments)
             setIsLoading(false)
         }
 
         load()
-    }, [id])
+    }, [fetchComments, id])
 
     const toggleSharing = async () => {
         if (!user || !diary || diary.user_id !== user.id) {
@@ -148,6 +174,80 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 reactedByCurrentUser: nextReacted,
             }
         })
+    }
+
+    const createComment = async () => {
+        if (!user || !diary || isPostingComment) {
+            return
+        }
+
+        const trimmedBody = commentBody.trim()
+
+        if (!trimmedBody) {
+            setMessage('コメントを入力してください')
+            return
+        }
+
+        if (trimmedBody.length > 1000) {
+            setMessage('コメントは1000文字以内で入力してください')
+            return
+        }
+
+        setIsPostingComment(true)
+        setMessage('')
+
+        const { data, error } = await supabase
+            .from('diary_comments')
+            .insert({
+                diary_id: diary.id,
+                user_id: user.id,
+                body: trimmedBody,
+            })
+            .select('id,diary_id,user_id,body,created_at,updated_at')
+            .single()
+
+        setIsPostingComment(false)
+
+        if (error) {
+            setMessage(`コメントの投稿に失敗しました: ${error.message}`)
+            return
+        }
+
+        const profileMap = await fetchProfilesByIds([user.id])
+        const nextComment = data as DiaryComment
+
+        setComments((currentComments) => [
+            ...currentComments,
+            {
+                ...nextComment,
+                author: profileMap.get(user.id) ?? null,
+            },
+        ])
+        setCommentBody('')
+    }
+
+    const deleteComment = async (commentId: string) => {
+        if (!user || deletingCommentIds.includes(commentId)) {
+            return
+        }
+
+        setDeletingCommentIds((currentIds) => [...currentIds, commentId])
+        setMessage('')
+
+        const { error } = await supabase
+            .from('diary_comments')
+            .delete()
+            .eq('id', commentId)
+            .eq('user_id', user.id)
+
+        setDeletingCommentIds((currentIds) => currentIds.filter((currentId) => currentId !== commentId))
+
+        if (error) {
+            setMessage(`コメントの削除に失敗しました: ${error.message}`)
+            return
+        }
+
+        setComments((currentComments) => currentComments.filter((comment) => comment.id !== commentId))
     }
 
     const deleteDiary = async () => {
@@ -280,6 +380,82 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                             <span>{reactionSummary.count}</span>
                         </button>
                     </div>
+
+                    <section className="mt-8 border-t border-zinc-100 pt-6">
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 className="text-lg font-bold text-zinc-950">コメント</h2>
+                            <p className="text-xs font-semibold text-zinc-500">{comments.length}件</p>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            {comments.length === 0 ? (
+                                <p className="rounded-2xl bg-zinc-50 px-4 py-5 text-sm text-zinc-500">
+                                    まだコメントはありません。
+                                </p>
+                            ) : (
+                                comments.map((comment) => {
+                                    const commentAuthorName = comment.author?.display_name ?? '名無し'
+                                    const isOwnComment = comment.user_id === user?.id
+                                    const isDeletingComment = deletingCommentIds.includes(comment.id)
+
+                                    return (
+                                        <article key={comment.id} className="flex gap-3 rounded-2xl bg-zinc-50 p-4">
+                                            <Avatar profile={comment.author} fallback={commentAuthorName} size="sm" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-bold text-zinc-900">{commentAuthorName}</p>
+                                                        <p className="mt-0.5 text-xs text-zinc-500">{formatDateTime(comment.created_at)}</p>
+                                                    </div>
+                                                    {isOwnComment && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void deleteComment(comment.id)}
+                                                            disabled={isDeletingComment}
+                                                            className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-500 transition hover:border-red-200 hover:text-red-600 disabled:text-zinc-300"
+                                                        >
+                                                            {isDeletingComment ? '削除中' : '削除'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-700">
+                                                    {comment.body}
+                                                </p>
+                                            </div>
+                                        </article>
+                                    )
+                                })
+                            )}
+                        </div>
+
+                        <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-3">
+                            <textarea
+                                value={commentBody}
+                                onChange={(event) => {
+                                    setCommentBody(event.target.value)
+                                    if (message === 'コメントを入力してください' || message === 'コメントは1000文字以内で入力してください') {
+                                        setMessage('')
+                                    }
+                                }}
+                                maxLength={1000}
+                                rows={3}
+                                placeholder="コメントを書く"
+                                disabled={isPostingComment}
+                                className="min-h-24 w-full resize-y rounded-xl border border-zinc-200 px-3 py-2 text-sm leading-7 text-zinc-800 outline-none placeholder:text-zinc-500 focus:border-zinc-400 disabled:bg-zinc-50"
+                            />
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                                <p className="text-xs font-semibold text-zinc-400">{commentBody.trim().length}/1000</p>
+                                <button
+                                    type="button"
+                                    onClick={() => void createComment()}
+                                    disabled={isPostingComment || !commentBody.trim()}
+                                    className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
+                                >
+                                    {isPostingComment ? '投稿中' : 'コメントする'}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </article>
 
