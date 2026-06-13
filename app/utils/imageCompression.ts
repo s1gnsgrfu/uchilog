@@ -31,7 +31,7 @@ const normalizeImageFile = async (file: File) => {
 
         return new File([convertedBlob], convertedName, { type: 'image/jpeg' })
     } catch {
-        return file
+        throw new Error('HEIC/HEIF画像を変換できませんでした。写真をJPEGまたはPNGに変換してから選択してください。')
     }
 }
 
@@ -87,7 +87,17 @@ const resizeToWebp = async (
 
 export const compressDiaryImage = async (file: File): Promise<DiaryImageFiles> => {
     const imageFile = await normalizeImageFile(file)
-    const source = await loadImage(imageFile)
+    let source: HTMLImageElement
+
+    try {
+        source = await loadImage(imageFile)
+    } catch {
+        if (isHeicImage(file)) {
+            throw new Error('HEIC/HEIF画像を読み込めませんでした。写真をJPEGまたはPNGに変換してから選択してください。')
+        }
+
+        throw new Error('画像を読み込めませんでした。別の画像を選択してください。')
+    }
 
     const thumb = await resizeToWebp(source, THUMB_WIDTH, THUMB_QUALITY, 'thumb.webp')
     const display = await resizeToWebp(source, DISPLAY_WIDTH, DISPLAY_QUALITY, 'display.webp')
