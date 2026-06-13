@@ -13,6 +13,76 @@ import { MobileNav } from '../components/MobileNav'
 import { compressDiaryImage } from '../utils/imageCompression'
 import { syncProfile } from '../utils/profiles'
 
+type UploadedDiaryImage = {
+    imageName: string
+    thumbUrl: string
+    displayUrl: string
+}
+
+const SERVER_IMAGE_TRANSFORM_SIZE_THRESHOLD = 3 * 1024 * 1024
+const SERVER_TRANSFORM_IMAGE_TYPES = new Set([
+    'image/avif',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+])
+const SERVER_TRANSFORM_IMAGE_EXTENSIONS = /\.(avif|jpe?g|png|webp)$/i
+
+const isServerTransformableImage = (file: File) => (
+    SERVER_TRANSFORM_IMAGE_TYPES.has(file.type)
+    || SERVER_TRANSFORM_IMAGE_EXTENSIONS.test(file.name)
+)
+
+const isMobileUploadClient = () => {
+    if (typeof navigator === 'undefined') {
+        return false
+    }
+
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+const shouldPreferServerImageTransform = (file: File) => {
+    if (!isServerTransformableImage(file)) {
+        return false
+    }
+
+    return isMobileUploadClient() || file.size >= SERVER_IMAGE_TRANSFORM_SIZE_THRESHOLD
+}
+
+const postImageUpload = async (formData: FormData, accessToken: string) => {
+    const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+    })
+
+    if (!response.ok) {
+        throw new Error('画像のアップロードに失敗しました')
+    }
+
+    return await response.json() as UploadedDiaryImage
+}
+
+const uploadCompressedDiaryImage = async (file: File, accessToken: string) => {
+    const compressed = await compressDiaryImage(file)
+    const formData = new FormData()
+    formData.append('thumb', compressed.thumb)
+    formData.append('display', compressed.display)
+    formData.append('originalName', file.name)
+
+    return await postImageUpload(formData, accessToken)
+}
+
+const uploadOriginalDiaryImage = async (file: File, accessToken: string) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    formData.append('originalName', file.name)
+
+    return await postImageUpload(formData, accessToken)
+}
+
 export default function WritePage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
@@ -101,25 +171,27 @@ export default function WritePage() {
             throw new Error('ログインが必要です')
         }
 
-        const compressed = await compressDiaryImage(file)
-        const formData = new FormData()
-        formData.append('thumb', compressed.thumb)
-        formData.append('display', compressed.display)
-        formData.append('originalName', file.name)
-
-        const response = await fetch('/api/images/upload', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-            body: formData,
-        })
-
-        if (!response.ok) {
-            throw new Error('画像のアップロードに失敗しました')
+        if (shouldPreferServerImageTransform(file)) {
+            try {
+                return await uploadOriginalDiaryImage(file, accessToken)
+            } catch {
+                return await uploadCompressedDiaryImage(file, accessToken)
+            }
         }
 
-        return await response.json() as { imageName: string; thumbUrl: string; displayUrl: string }
+        try {
+            return await uploadCompressedDiaryImage(file, accessToken)
+        } catch (error) {
+            if (!isServerTransformableImage(file)) {
+                throw error
+            }
+
+            try {
+                return await uploadOriginalDiaryImage(file, accessToken)
+            } catch {
+                throw error
+            }
+        }
     }
 
     const captureBodySelection = () => {
@@ -361,11 +433,14 @@ export default function WritePage() {
                         </span>
                     </label>
                     {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <p className="text-xs text-zinc-500">
+                            大きい画像は自動で軽くして保存します。
+                        </p>
                         <input
                             ref={imageInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.heic,.heif"
                             disabled={isCheckingAuth || isSubmitting || isProcessingImage}
                             onChange={(event) => {
                                 const file = event.target.files?.[0] ?? null
