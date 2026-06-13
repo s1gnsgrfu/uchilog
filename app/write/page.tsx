@@ -365,7 +365,7 @@ export default function WritePage() {
                         <input
                             ref={imageInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.heic,.heif"
                             disabled={isCheckingAuth || isSubmitting || isProcessingImage}
                             onChange={(event) => {
                                 const file = event.target.files?.[0] ?? null

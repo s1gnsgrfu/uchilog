@@ -8,6 +8,33 @@ const THUMB_QUALITY = 0.75
 const DISPLAY_WIDTH = 1600
 const DISPLAY_QUALITY = 0.8
 
+const isHeicImage = (file: File) => {
+    return file.type === 'image/heic'
+        || file.type === 'image/heif'
+        || /\.(heic|heif)$/i.test(file.name)
+}
+
+const normalizeImageFile = async (file: File) => {
+    if (!isHeicImage(file)) {
+        return file
+    }
+
+    try {
+        const { default: heic2any } = await import('heic2any')
+        const converted = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.92,
+        })
+        const convertedBlob = Array.isArray(converted) ? converted[0] : converted
+        const convertedName = file.name.replace(/\.(heic|heif)$/i, '.jpg')
+
+        return new File([convertedBlob], convertedName, { type: 'image/jpeg' })
+    } catch {
+        return file
+    }
+}
+
 const loadImage = (file: File) => new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image()
     const objectUrl = URL.createObjectURL(file)
@@ -52,16 +79,18 @@ const resizeToWebp = async (
         throw new Error('WebP画像を作成できませんでした')
     }
 
+    canvas.width = 0
+    canvas.height = 0
+
     return new File([blob], fileName, { type: 'image/webp' })
 }
 
 export const compressDiaryImage = async (file: File): Promise<DiaryImageFiles> => {
-    const source = await loadImage(file)
+    const imageFile = await normalizeImageFile(file)
+    const source = await loadImage(imageFile)
 
-    const [thumb, display] = await Promise.all([
-        resizeToWebp(source, THUMB_WIDTH, THUMB_QUALITY, 'thumb.webp'),
-        resizeToWebp(source, DISPLAY_WIDTH, DISPLAY_QUALITY, 'display.webp'),
-    ])
+    const thumb = await resizeToWebp(source, THUMB_WIDTH, THUMB_QUALITY, 'thumb.webp')
+    const display = await resizeToWebp(source, DISPLAY_WIDTH, DISPLAY_QUALITY, 'display.webp')
 
     return { thumb, display }
 }
