@@ -1,8 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
-import { getDiaryImagesBucket } from '../_r2'
+import { getDiaryImagesBucket, getImagesBinding } from '../_r2'
 
 const MAX_THUMB_SIZE = 512 * 1024
 const MAX_DISPLAY_SIZE = 3 * 1024 * 1024
+const MAX_ORIGINAL_SIZE = 15 * 1024 * 1024
+const THUMB_WIDTH = 400
+const THUMB_QUALITY = 75
+const DISPLAY_WIDTH = 1600
+const DISPLAY_QUALITY = 80
+const SUPPORTED_SERVER_IMAGE_TYPES = new Set([
+    'image/avif',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+])
+const SUPPORTED_SERVER_IMAGE_EXTENSIONS = /\.(avif|jpe?g|png|webp)$/i
 
 type UploadResult = {
     imageName: string
@@ -52,6 +64,64 @@ function isValidWebpFile(value: FormDataEntryValue | null, maxSize: number): val
         && value.size <= maxSize
 }
 
+function isValidOriginalImageFile(value: FormDataEntryValue | null): value is File {
+    return value instanceof File
+        && (
+            SUPPORTED_SERVER_IMAGE_TYPES.has(value.type)
+            || SUPPORTED_SERVER_IMAGE_EXTENSIONS.test(value.name)
+        )
+        && value.size > 0
+        && value.size <= MAX_ORIGINAL_SIZE
+}
+
+async function transformToWebp(file: File, width: number, quality: number) {
+    const images = await getImagesBinding()
+    const result = await images
+        .input(file.stream())
+        .transform({
+            width,
+            fit: 'scale-down',
+        })
+        .output({
+            format: 'image/webp',
+            quality,
+        })
+
+    return await new Response(result.image()).arrayBuffer()
+}
+
+async function getUploadImageBuffers(formData: FormData) {
+    const thumb = formData.get('thumb')
+    const display = formData.get('display')
+
+    if (isValidWebpFile(thumb, MAX_THUMB_SIZE) && isValidWebpFile(display, MAX_DISPLAY_SIZE)) {
+        return {
+            thumbBuffer: await thumb.arrayBuffer(),
+            displayBuffer: await display.arrayBuffer(),
+        }
+    }
+
+    const image = formData.get('image')
+
+    if (!isValidOriginalImageFile(image)) {
+        return null
+    }
+
+    const [thumbBuffer, displayBuffer] = await Promise.all([
+        transformToWebp(image, THUMB_WIDTH, THUMB_QUALITY),
+        transformToWebp(image, DISPLAY_WIDTH, DISPLAY_QUALITY),
+    ])
+
+    if (thumbBuffer.byteLength > MAX_THUMB_SIZE || displayBuffer.byteLength > MAX_DISPLAY_SIZE) {
+        return null
+    }
+
+    return {
+        thumbBuffer,
+        displayBuffer,
+    }
+}
+
 function getSafeImageBaseName(originalName: string) {
     const fileName = originalName.split(/[/\\]/).pop() ?? ''
     const baseName = fileName.replace(/\.[^.]+$/, '')
@@ -99,12 +169,11 @@ export async function POST(request: Request) {
         }
 
         const formData = await request.formData()
-        const thumb = formData.get('thumb')
-        const display = formData.get('display')
         const originalNameValue = formData.get('originalName')
         const originalName = typeof originalNameValue === 'string' ? originalNameValue.slice(0, 120) : ''
+        const imageBuffers = await getUploadImageBuffers(formData)
 
-        if (!isValidWebpFile(thumb, MAX_THUMB_SIZE) || !isValidWebpFile(display, MAX_DISPLAY_SIZE)) {
+        if (!imageBuffers) {
             return Response.json(
                 { error: 'invalid_image' },
                 { status: 400 }
@@ -120,7 +189,7 @@ export async function POST(request: Request) {
         const cacheControl = 'public, max-age=31536000, immutable'
 
         await Promise.all([
-            bucket.put(thumbKey, await thumb.arrayBuffer(), {
+            bucket.put(thumbKey, imageBuffers.thumbBuffer, {
                 httpMetadata: {
                     contentType: 'image/webp',
                     cacheControl,
@@ -132,7 +201,7 @@ export async function POST(request: Request) {
                     variant: 'thumb',
                 },
             }),
-            bucket.put(displayKey, await display.arrayBuffer(), {
+            bucket.put(displayKey, imageBuffers.displayBuffer, {
                 httpMetadata: {
                     contentType: 'image/webp',
                     cacheControl,
