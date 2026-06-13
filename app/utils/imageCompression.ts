@@ -10,7 +10,14 @@ const THUMB_QUALITY = 0.75
 const DISPLAY_WIDTH = 1600
 const DISPLAY_QUALITY = 0.8
 
-const loadImage = (file: File) => new Promise<HTMLImageElement>((resolve, reject) => {
+type LoadedImage = {
+    source: CanvasImageSource
+    width: number
+    height: number
+    close?: () => void
+}
+
+const loadImageElement = (file: File) => new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image()
     const objectUrl = URL.createObjectURL(file)
 
@@ -25,15 +32,52 @@ const loadImage = (file: File) => new Promise<HTMLImageElement>((resolve, reject
     image.src = objectUrl
 })
 
+const loadResizedImageBitmap = async (file: File, width: number, height: number): Promise<LoadedImage> => {
+    if (typeof createImageBitmap !== 'function') {
+        throw new Error('createImageBitmap is not supported')
+    }
+
+    const imageBitmap = await createImageBitmap(file, {
+        resizeWidth: width,
+        resizeHeight: height,
+        resizeQuality: 'high',
+        imageOrientation: 'from-image',
+    })
+
+    return {
+        source: imageBitmap,
+        width: imageBitmap.width,
+        height: imageBitmap.height,
+        close: () => imageBitmap.close(),
+    }
+}
+
+const loadImageForResize = async (file: File, maxWidth: number): Promise<LoadedImage> => {
+    const image = await loadImageElement(file)
+    const ratio = Math.min(1, maxWidth / image.naturalWidth)
+    const width = Math.max(1, Math.round(image.naturalWidth * ratio))
+    const height = Math.max(1, Math.round(image.naturalHeight * ratio))
+
+    try {
+        return await loadResizedImageBitmap(file, width, height)
+    } catch {
+        return {
+            source: image,
+            width,
+            height,
+        }
+    }
+}
+
 const resizeToWebp = async (
-    source: HTMLImageElement,
+    image: LoadedImage,
     maxWidth: number,
     quality: number,
     fileName: string
 ) => {
-    const ratio = Math.min(1, maxWidth / source.naturalWidth)
-    const width = Math.max(1, Math.round(source.naturalWidth * ratio))
-    const height = Math.max(1, Math.round(source.naturalHeight * ratio))
+    const ratio = Math.min(1, maxWidth / image.width)
+    const width = Math.max(1, Math.round(image.width * ratio))
+    const height = Math.max(1, Math.round(image.height * ratio))
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
@@ -44,7 +88,7 @@ const resizeToWebp = async (
         throw new Error('画像を変換できませんでした')
     }
 
-    context.drawImage(source, 0, 0, width, height)
+    context.drawImage(image.source, 0, 0, width, height)
 
     const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, 'image/webp', quality)
@@ -54,6 +98,7 @@ const resizeToWebp = async (
         throw new Error('WebP画像を作成できませんでした')
     }
 
+    image.close?.()
     canvas.width = 0
     canvas.height = 0
 
@@ -62,10 +107,10 @@ const resizeToWebp = async (
 
 export const compressDiaryImage = async (file: File): Promise<DiaryImageFiles> => {
     const imageFile = await convertHeicToWebp(file)
-    let source: HTMLImageElement
+    let displaySource: LoadedImage
 
     try {
-        source = await loadImage(imageFile)
+        displaySource = await loadImageForResize(imageFile, DISPLAY_WIDTH)
     } catch {
         if (isHeicOrHeifImage(file)) {
             throw new Error('HEIC/HEIF画像を読み込めませんでした。写真をJPEGまたはPNGに変換してから選択してください。')
@@ -74,8 +119,9 @@ export const compressDiaryImage = async (file: File): Promise<DiaryImageFiles> =
         throw new Error('画像を読み込めませんでした。別の画像を選択してください。')
     }
 
-    const thumb = await resizeToWebp(source, THUMB_WIDTH, THUMB_QUALITY, 'thumb.webp')
-    const display = await resizeToWebp(source, DISPLAY_WIDTH, DISPLAY_QUALITY, 'display.webp')
+    const display = await resizeToWebp(displaySource, DISPLAY_WIDTH, DISPLAY_QUALITY, 'display.webp')
+    const thumbSource = await loadImageForResize(display, THUMB_WIDTH)
+    const thumb = await resizeToWebp(thumbSource, THUMB_WIDTH, THUMB_QUALITY, 'thumb.webp')
 
     return { thumb, display }
 }
