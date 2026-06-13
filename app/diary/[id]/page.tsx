@@ -224,6 +224,29 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
             },
         ])
         setCommentBody('')
+        await notifyDiaryCommented(nextComment.id)
+    }
+
+    const notifyDiaryCommented = async (commentId: string) => {
+        const { data } = await supabase.auth.getSession()
+        const accessToken = data.session?.access_token
+
+        if (!accessToken) {
+            return
+        }
+
+        try {
+            await fetch('/api/push/notify-comment', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ commentId }),
+            })
+        } catch {
+            // 通知に失敗しても、コメント投稿自体の成功扱いは変えない。
+        }
     }
 
     const deleteComment = async (commentId: string) => {
