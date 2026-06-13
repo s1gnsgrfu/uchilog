@@ -361,7 +361,10 @@ export default function WritePage() {
                         </span>
                     </label>
                     {fieldErrors.body && <p className="text-sm font-semibold text-red-600">{fieldErrors.body}</p>}
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <p className="text-xs text-zinc-500">
+                            HEICで失敗する場合はJPEG/PNGに変換してください。
+                        </p>
                         <input
                             ref={imageInputRef}
                             type="file"
