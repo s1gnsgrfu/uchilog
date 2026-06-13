@@ -37,6 +37,10 @@ export const convertHeicToWebp = async (file: File) => {
         return file
     }
 
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        throw new Error('画像の変換に失敗しました')
+    }
+
     try {
         const { default: heic2any } = await import('heic2any')
         const jpegResult = await heic2any({
