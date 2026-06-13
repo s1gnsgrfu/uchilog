@@ -26,9 +26,36 @@ export type R2BucketLike = {
     get: (key: string) => Promise<R2ObjectBodyLike | null>
 }
 
+type ImagesOutputOptions = {
+    format: 'image/webp'
+    quality: number
+}
+
+type ImagesTransformOptions = {
+    width: number
+    fit: 'scale-down'
+}
+
+type ImagesTransformResultLike = {
+    image: () => ReadableStream
+}
+
+type ImagesTransformBuilderLike = {
+    output: (options: ImagesOutputOptions) => Promise<ImagesTransformResultLike>
+}
+
+type ImagesSourceLike = {
+    transform: (options: ImagesTransformOptions) => ImagesTransformBuilderLike
+}
+
+export type ImagesBindingLike = {
+    input: (image: ReadableStream) => ImagesSourceLike
+}
+
 type CloudflareContext = {
     env: {
         DIARY_IMAGES?: R2BucketLike
+        IMAGES?: ImagesBindingLike
     }
 }
 
@@ -40,6 +67,16 @@ export async function getDiaryImagesBucket() {
     }
 
     return env.DIARY_IMAGES
+}
+
+export async function getImagesBinding() {
+    const { env } = await getCloudflareContext({ async: true }) as CloudflareContext
+
+    if (!env.IMAGES) {
+        throw new Error('IMAGES binding is not configured')
+    }
+
+    return env.IMAGES
 }
 
 export function imageResponseHeaders(object: R2ObjectBodyLike) {
