@@ -12,7 +12,11 @@ import { DesktopHeaderActions } from '../components/DesktopHeaderActions'
 import { LogoutConfirmDialog } from '../components/LogoutConfirmDialog'
 import { MobileNav } from '../components/MobileNav'
 import { profileFromUserMetadata, syncProfile } from '../utils/profiles'
-import type { Profile } from '../utils/types'
+import type { Diary, Profile } from '../utils/types'
+import { createZipBlob } from '../utils/zip'
+
+type ExportRange = 'all' | 'month'
+type ExportFormat = 'md' | 'txt'
 
 const installSteps = [
     {
@@ -45,6 +49,96 @@ const installSteps = [
 ]
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
+
+const getDateParts = (date: Date) => {
+    const year = String(date.getFullYear())
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+
+    return { day, month, year }
+}
+
+const getTodayKey = () => {
+    const { day, month, year } = getDateParts(new Date())
+
+    return `${year}${month}${day}`
+}
+
+const getCurrentMonthInputValue = () => {
+    const { month, year } = getDateParts(new Date())
+
+    return `${year}-${month}`
+}
+
+const sanitizeFileName = (value: string) => {
+    const normalizedValue = value
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, ' ')
+        .replace(/\.+$/g, '')
+
+    return normalizedValue || 'untitled'
+}
+
+const getMonthRange = (monthValue: string) => {
+    const [yearValue, monthPart] = monthValue.split('-')
+    const year = Number(yearValue)
+    const month = Number(monthPart)
+
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return null
+    }
+
+    const start = new Date(year, month - 1, 1)
+    const end = new Date(year, month, 1)
+
+    return {
+        start: start.toISOString(),
+        end: end.toISOString(),
+    }
+}
+
+const buildExportBody = (diary: Diary, format: ExportFormat) => {
+    const createdAt = new Date(diary.created_at)
+    const updatedAt = new Date(diary.updated_at)
+    const visibility = diary.is_shared ? 'みんなに共有' : '自分だけ'
+
+    if (format === 'md') {
+        return [
+            `# ${diary.title}`,
+            '',
+            `- 作成日時: ${createdAt.toLocaleString('ja-JP')}`,
+            `- 更新日時: ${updatedAt.toLocaleString('ja-JP')}`,
+            `- 公開範囲: ${visibility}`,
+            '',
+            diary.body,
+            '',
+        ].join('\n')
+    }
+
+    return [
+        diary.title,
+        '',
+        `作成日時: ${createdAt.toLocaleString('ja-JP')}`,
+        `更新日時: ${updatedAt.toLocaleString('ja-JP')}`,
+        `公開範囲: ${visibility}`,
+        '',
+        diary.body,
+        '',
+    ].join('\n')
+}
+
+const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -79,6 +173,11 @@ export default function MenuPage() {
     const [notificationSubscription, setNotificationSubscription] = useState<PushSubscription | null>(null)
     const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false)
     const [notificationMessage, setNotificationMessage] = useState('')
+    const [exportRange, setExportRange] = useState<ExportRange>('all')
+    const [exportMonth, setExportMonth] = useState(getCurrentMonthInputValue())
+    const [exportFormat, setExportFormat] = useState<ExportFormat>('md')
+    const [isExporting, setIsExporting] = useState(false)
+    const [exportMessage, setExportMessage] = useState('')
 
     const setProfileForm = (nextProfile: Profile | null) => {
         setProfile(nextProfile)
@@ -312,6 +411,76 @@ export default function MenuPage() {
         }
     }
 
+    const exportDiaries = async () => {
+        if (!user || isExporting) {
+            return
+        }
+
+        setIsExporting(true)
+        setExportMessage('')
+
+        try {
+            let query = supabase
+                .from('diaries')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: true })
+
+            if (exportRange === 'month') {
+                const monthRange = getMonthRange(exportMonth)
+
+                if (!monthRange) {
+                    setExportMessage('保存する月を選んでください。')
+                    return
+                }
+
+                query = query
+                    .gte('created_at', monthRange.start)
+                    .lt('created_at', monthRange.end)
+            }
+
+            const { data, error } = await query
+
+            if (error) {
+                setExportMessage(`エクスポートに失敗しました: ${error.message}`)
+                return
+            }
+
+            const diaries = (data ?? []) as Diary[]
+
+            if (diaries.length === 0) {
+                setExportMessage('保存できる日記がありません。')
+                return
+            }
+
+            const folderName = `${getTodayKey()}uchilog`
+            const usedFileNames = new Map<string, number>()
+            const files = diaries.map((diary) => {
+                const createdAt = new Date(diary.created_at)
+                const { day, month, year } = getDateParts(createdAt)
+                const baseFileName = `${year}-${month}-${day}-${sanitizeFileName(diary.title)}`
+                const usedCount = usedFileNames.get(baseFileName) ?? 0
+                const fileName = usedCount === 0 ? baseFileName : `${baseFileName}-${usedCount + 1}`
+
+                usedFileNames.set(baseFileName, usedCount + 1)
+
+                return {
+                    path: `${folderName}/${fileName}.${exportFormat}`,
+                    content: buildExportBody(diary, exportFormat),
+                    updatedAt: createdAt,
+                }
+            })
+            const zipBlob = createZipBlob(files)
+
+            downloadBlob(zipBlob, `${folderName}.zip`)
+            setExportMessage(`${diaries.length}件の日記を保存しました。`)
+        } catch {
+            setExportMessage('エクスポートに失敗しました。通信状態を確認してください。')
+        } finally {
+            setIsExporting(false)
+        }
+    }
+
     const logout = async () => {
         const { error } = await supabase.auth.signOut()
 
@@ -476,6 +645,96 @@ export default function MenuPage() {
                     )}
                     {notificationMessage && (
                         <p className="text-xs font-semibold text-zinc-600">{notificationMessage}</p>
+                    )}
+                </section>
+
+                <section className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                    <div>
+                        <h2 className="text-lg font-bold text-zinc-950">日記エクスポート</h2>
+                        <p className="mt-1 text-sm leading-6 text-zinc-500">
+                            自分の日記をZIPで保存できます。
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold text-zinc-500">期間</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setExportRange('all')}
+                                aria-pressed={exportRange === 'all'}
+                                className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
+                                    exportRange === 'all'
+                                        ? 'bg-zinc-950 text-white ring-zinc-950'
+                                        : 'bg-white text-zinc-600 ring-zinc-200 hover:text-zinc-950'
+                                }`}
+                            >
+                                全期間
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setExportRange('month')}
+                                aria-pressed={exportRange === 'month'}
+                                className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
+                                    exportRange === 'month'
+                                        ? 'bg-zinc-950 text-white ring-zinc-950'
+                                        : 'bg-white text-zinc-600 ring-zinc-200 hover:text-zinc-950'
+                                }`}
+                            >
+                                1ヶ月
+                            </button>
+                        </div>
+                        {exportRange === 'month' && (
+                            <input
+                                type="month"
+                                value={exportMonth}
+                                onChange={(event) => setExportMonth(event.target.value)}
+                                className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-zinc-800 outline-none focus:border-zinc-400"
+                            />
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold text-zinc-500">形式</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setExportFormat('md')}
+                                aria-pressed={exportFormat === 'md'}
+                                className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
+                                    exportFormat === 'md'
+                                        ? 'bg-zinc-950 text-white ring-zinc-950'
+                                        : 'bg-white text-zinc-600 ring-zinc-200 hover:text-zinc-950'
+                                }`}
+                            >
+                                Markdown
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setExportFormat('txt')}
+                                aria-pressed={exportFormat === 'txt'}
+                                className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
+                                    exportFormat === 'txt'
+                                        ? 'bg-zinc-950 text-white ring-zinc-950'
+                                        : 'bg-white text-zinc-600 ring-zinc-200 hover:text-zinc-950'
+                                }`}
+                            >
+                                Text
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => void exportDiaries()}
+                        disabled={isExporting || (exportRange === 'month' && !exportMonth)}
+                        className="w-full rounded-full bg-zinc-950 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:bg-zinc-400"
+                    >
+                        {isExporting ? '作成中' : 'ZIPをダウンロード'}
+                    </button>
+
+                    {exportMessage && (
+                        <p className="text-xs font-semibold text-zinc-600">{exportMessage}</p>
                     )}
                 </section>
 
