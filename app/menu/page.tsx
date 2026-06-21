@@ -50,6 +50,14 @@ const installSteps = [
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
 
+const getBrowserTimezone = () => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo'
+    } catch {
+        return 'Asia/Tokyo'
+    }
+}
+
 const getDateParts = (date: Date) => {
     const year = String(date.getFullYear())
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -173,6 +181,11 @@ export default function MenuPage() {
     const [notificationSubscription, setNotificationSubscription] = useState<PushSubscription | null>(null)
     const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false)
     const [notificationMessage, setNotificationMessage] = useState('')
+    const [reminderEnabled, setReminderEnabled] = useState(false)
+    const [reminderTime, setReminderTime] = useState('21:00')
+    const [reminderTimezone, setReminderTimezone] = useState('Asia/Tokyo')
+    const [isSavingReminder, setIsSavingReminder] = useState(false)
+    const [reminderMessage, setReminderMessage] = useState('')
     const [exportRange, setExportRange] = useState<ExportRange>('all')
     const [exportMonth, setExportMonth] = useState(getCurrentMonthInputValue())
     const [exportFormat, setExportFormat] = useState<ExportFormat>('md')
@@ -211,6 +224,26 @@ export default function MenuPage() {
                 }
 
                 setProfileForm(syncedProfile)
+
+                const { data: reminderSetting, error: reminderError } = await supabase
+                    .from('diary_reminder_settings')
+                    .select('enabled,reminder_time,timezone')
+                    .eq('user_id', sessionUser.id)
+                    .maybeSingle()
+
+                if (!isMounted) {
+                    return
+                }
+
+                if (reminderError) {
+                    setReminderMessage('リマインド設定の読み込みに失敗しました')
+                } else if (reminderSetting) {
+                    setReminderEnabled(reminderSetting.enabled)
+                    setReminderTime(reminderSetting.reminder_time.slice(0, 5))
+                    setReminderTimezone(reminderSetting.timezone)
+                } else {
+                    setReminderTimezone(getBrowserTimezone())
+                }
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '不明なエラー'
                 setMessage(`プロフィールの読み込みに失敗しました: ${errorMessage}`)
@@ -409,6 +442,48 @@ export default function MenuPage() {
         } finally {
             setIsUpdatingNotifications(false)
         }
+    }
+
+    const saveReminderSettings = async () => {
+        if (!user) {
+            return
+        }
+
+        if (reminderEnabled && !notificationSubscription) {
+            setReminderMessage('先に端末の通知をオンにしてください')
+            return
+        }
+
+        if (!/^\d{2}:\d{2}$/.test(reminderTime)) {
+            setReminderMessage('通知時刻を選んでください')
+            return
+        }
+
+        const timezone = getBrowserTimezone()
+        setIsSavingReminder(true)
+        setReminderMessage('')
+
+        const { error } = await supabase
+            .from('diary_reminder_settings')
+            .upsert({
+                user_id: user.id,
+                enabled: reminderEnabled,
+                reminder_time: reminderTime,
+                timezone,
+                updated_at: new Date().toISOString(),
+            }, {
+                onConflict: 'user_id',
+            })
+
+        setIsSavingReminder(false)
+
+        if (error) {
+            setReminderMessage(`リマインド設定の保存に失敗しました: ${error.message}`)
+            return
+        }
+
+        setReminderTimezone(timezone)
+        setReminderMessage(reminderEnabled ? '日記リマインドをオンにしました' : '日記リマインドをオフにしました')
     }
 
     const exportDiaries = async () => {
@@ -646,6 +721,64 @@ export default function MenuPage() {
                     {notificationMessage && (
                         <p className="text-xs font-semibold text-zinc-600">{notificationMessage}</p>
                     )}
+
+                    <div className="space-y-3 border-t border-zinc-100 pt-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-bold text-zinc-900">日記リマインド</h3>
+                                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                    その日に日記を書いていないときだけ通知します。
+                                </p>
+                            </div>
+                            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={reminderEnabled}
+                                    onChange={(event) => {
+                                        setReminderEnabled(event.target.checked)
+                                        setReminderMessage('')
+                                    }}
+                                    className="peer sr-only"
+                                />
+                                <span className="h-6 w-11 rounded-full bg-zinc-300 transition peer-checked:bg-zinc-950 peer-focus-visible:ring-2 peer-focus-visible:ring-zinc-400 peer-focus-visible:ring-offset-2 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
+                                <span className="sr-only">日記リマインドを切り替える</span>
+                            </label>
+                        </div>
+
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                            <label className="min-w-0">
+                                <span className="block text-xs font-bold text-zinc-600">通知時刻</span>
+                                <input
+                                    type="time"
+                                    value={reminderTime}
+                                    onChange={(event) => {
+                                        setReminderTime(event.target.value)
+                                        setReminderMessage('')
+                                    }}
+                                    disabled={!reminderEnabled}
+                                    className="mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 outline-none focus:border-zinc-400 disabled:bg-zinc-100 disabled:text-zinc-400"
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => void saveReminderSettings()}
+                                disabled={isSavingReminder}
+                                className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:bg-zinc-400"
+                            >
+                                {isSavingReminder ? '保存中' : '保存'}
+                            </button>
+                        </div>
+
+                        <p className="text-xs leading-5 text-zinc-400">
+                            {reminderTimezone}の時刻として保存されます。
+                        </p>
+                        {reminderEnabled && !notificationSubscription && (
+                            <p className="text-xs font-semibold text-amber-700">リマインドを受け取るには端末の通知をオンにしてください。</p>
+                        )}
+                        {reminderMessage && (
+                            <p className="text-xs font-semibold text-zinc-600">{reminderMessage}</p>
+                        )}
+                    </div>
                 </section>
 
                 <section className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
