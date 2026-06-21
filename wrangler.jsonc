@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
+	"main": "worker.ts",
 	"name": "uchilog",
 	"compatibility_date": "2026-05-27",
 	"compatibility_flags": [
@@ -21,6 +21,11 @@
 	"images": {
 		"binding": "IMAGES"
 	},
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
 	"r2_buckets": [
 		{
 			"binding": "DIARY_IMAGES",
@@ -30,6 +35,11 @@
 	"env": {
 		"dev": {
 			"name": "uchilog-dev",
+			"triggers": {
+				"crons": [
+					"* * * * *"
+				]
+			},
 			"services": [
 				{
 					"binding": "WORKER_SELF_REFERENCE",
